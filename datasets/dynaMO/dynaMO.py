@@ -1,4 +1,5 @@
 # this is supposed to be a dynamic MNIST creator
+# dynaMO is short for dynamic MNIST with Occlusion
 # it creates stereoscopic views of two or three MNIST digits
 # that can be modified by simply changing the viewpoint
 # Parallax
@@ -83,11 +84,11 @@ def getch():
         return ch
     return _getch()
 
-class dynomnistSample(object):
-    """docstring for dynomnistSample."""
+class dynaMOSample(object):
+    """docstring for dynaMOSample."""
 
     def __init__(self, targets, labels, cam_pos, xyz_tars, movement=None):
-        super(dynomnistSample, self).__init__()
+        super(dynaMOSample, self).__init__()
         self.targets = targets
         self.labels = labels
         self.cam_pos = cam_pos
@@ -201,11 +202,11 @@ class dynomnistSample(object):
         print('done.')
 
 
-class dynomnistBuilder(object):
-    """docstring for dynomnistBuilder."""
+class dynaMOBuilder(object):
+    """docstring for dynaMOBuilder."""
 
     def __init__(self, num_class=10, class_duplicates=True, timesteps=15, n_proliferation=10, n_threads=2):
-        super(dynomnistBuilder, self).__init__()
+        super(dynaMOBuilder, self).__init__()
         self.num_class = num_class
         self.n_proliferation = n_proliferation
         self.n_threads = n_threads
@@ -247,7 +248,7 @@ class dynomnistBuilder(object):
                     xyz_tars = [[np.random.uniform()*0.3+0.15,np.random.uniform()*0.3+0.15,.3],
                                 [np.random.uniform()*0.4+0.2,np.random.uniform()*0.4+0.2,.4],
                                 [np.random.uniform()*0.5+0.25,np.random.uniform()*0.5+0.25,.5]]
-                    sample = dynomnistSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
+                    sample = dynaMOSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
                     filename = './image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
@@ -289,7 +290,7 @@ def create_sample_animations(N=10):
         movement_x = [move]*10 + [-move]*20 + [move]*10 + [0]*40 + [move]*10 + [-move]*20 +[move]*10
         movement_y = [0]*40 + [move]*10 + [-move]*20 + [move]*10 + [move]*10 + [-move]*20 +[move]*10
         movement = [movement_x, movement_y]
-        sample = dynomnistSample(targets, labels, [cam_x_pos, cam_y_pos], xyz_tars, movement)
+        sample = dynaMOSample(targets, labels, [cam_x_pos, cam_y_pos], xyz_tars, movement)
         sample.animate_parallax('parallax_{}'.format(i), frames=len(sample.movement[0]), interval=50)
 
 if __name__ == "__main__":
@@ -307,7 +308,7 @@ if __name__ == "__main__":
                         [np.random.uniform()*0.5+0.25,np.random.uniform()*0.5+0.25,.5]]
 
 
-            return dynomnistSample(targets, labels, [cam_x_pos, cam_y_pos], xyz_tars)
+            return dynaMOSample(targets, labels, [cam_x_pos, cam_y_pos], xyz_tars)
 
         sample = resample()
         switch = True
@@ -338,6 +339,6 @@ if __name__ == "__main__":
             plt.pause(.01)
 
     else:
-        b = dynomnistBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
+        b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='train')
         b.build(target='test')

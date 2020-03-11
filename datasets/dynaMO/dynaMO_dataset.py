@@ -63,7 +63,7 @@ from torchvision import transforms, utils
 # torchvision.datasets.ImageFolder dataset
 
 
-class dynomnistDataset(Dataset):
+class dynaMODataset(Dataset):
     """Dynamic Occluded MNIST Dataset"""
 
     def __init__(self, root_dir, transform=None):
@@ -136,8 +136,8 @@ class ToTensor(object):
 
 
 
-transformed_dataset = dynomnistDataset(
-    root_dir='/Users/markus/Research/Code/titan/datasets/dynomnist/image_files/test/',
+transformed_dataset = dynaMODataset(
+    root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/test/',
     transform=transforms.Compose([
                                    ToTensor() #,
                                    # transforms.Normalize(
