@@ -22,8 +22,30 @@ from get_mnist import get
 # commandline arguments
 # -----
 
-
 parser = argparse.ArgumentParser()
+parser.add_argument(
+     "-npr",
+     "--nproliferation",
+     type=int,
+     default=10,
+     help='number of images per image')
+parser.add_argument(
+     "-nth",
+     "--nthreads",
+     type=int,
+     default=2,
+     help='number of threads for the builder')
+parser.add_argument(
+     "-tst",
+     "--timesteps",
+     type=int,
+     default=15,
+     help='how many timesteps are visualized')
+
+parser.add_argument('--classduplicates', dest='classduplicates', action='store_true')
+parser.add_argument('--no-classduplicates', dest='classduplicates', action='store_false')
+parser.set_defaults(classduplicates=True)
+
 parser.add_argument('--interactive', dest='interactive', action='store_true')
 parser.add_argument('--no-interactive', dest='interactive', action='store_false')
 parser.set_defaults(interactive=False)
@@ -187,12 +209,13 @@ class dynomnistBuilder(object):
         self.class_duplicates = class_duplicates
         self.timesteps = timesteps
 
-    def build(self, target='training'):
-        if target=='training':
+    def build(self, target='train'):
+        if target=='train':
             data, labels, _, _  = get()
         else:
             _, _, data, labels  = get()
 
+        self.target = target
 
         def work(data, labels, thread_number):
             print("Task {} assigned to thread: {}".format(thread_number, threading.current_thread().name))
@@ -223,15 +246,15 @@ class dynomnistBuilder(object):
                     sample = dynomnistSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = './image_files/{}/t{}i{}_{}{}{}'.format(sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
+                    filename = './image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state(filename)
                     print(" " * 80 + "\r" +
                         '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
             return None
 
-        #data=data[:100]
-        #labels = labels[:100]
+        data=data[:30]
+        labels = labels[:30]
         # split the data
         datasize_per_thread = data.shape[0]//self.n_threads
         # establish threads
@@ -265,10 +288,7 @@ def create_sample_animations(N=10):
 if __name__ == "__main__":
 
     if args.interactive:
-        #get mnist
         train, train_labels, test, test_labels  = get()
-        #import matplotlib
-        #matplotlib.use('GTK3Cairo')
 
         def resample():
             choice = np.random.choice(train.shape[0], 3)
@@ -311,5 +331,6 @@ if __name__ == "__main__":
             plt.pause(.01)
 
     else:
-        b = dynomnistBuilder()
-        b.build()
+        b = dynomnistBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
+        b.build(target='train')
+        b.build(target='test')
