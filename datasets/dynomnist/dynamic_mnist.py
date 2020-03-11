@@ -223,7 +223,7 @@ class dynomnistBuilder(object):
                     sample = dynomnistSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = './samples/{}/t{}i{}_{}{}{}'.format(sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
+                    filename = './image_files/{}/t{}i{}_{}{}{}'.format(sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state(filename)
                     print(" " * 80 + "\r" +
