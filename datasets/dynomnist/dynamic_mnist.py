@@ -46,6 +46,10 @@ parser.add_argument('--classduplicates', dest='classduplicates', action='store_t
 parser.add_argument('--no-classduplicates', dest='classduplicates', action='store_false')
 parser.set_defaults(classduplicates=True)
 
+parser.add_argument('--testrun', dest='testrun', action='store_true')
+parser.add_argument('--no-testrun', dest='testrun', action='store_false')
+parser.set_defaults(testrun=False)
+
 parser.add_argument('--interactive', dest='interactive', action='store_true')
 parser.add_argument('--no-interactive', dest='interactive', action='store_false')
 parser.set_defaults(interactive=False)
@@ -253,8 +257,9 @@ class dynomnistBuilder(object):
                         '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
             return None
 
-        data=data[:30]
-        labels = labels[:30]
+        if args.testrun:
+            data=data[:30]
+            labels = labels[:30]
         # split the data
         datasize_per_thread = data.shape[0]//self.n_threads
         # establish threads
