@@ -253,8 +253,10 @@ class dynomnistBuilder(object):
                     filename = './image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state(filename)
-                    print(" " * 80 + "\r" +
-                        '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
+                    #print(" " * 80 + "\r" +
+                    #    '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
+                    if (p+1 + i*self.n_proliferation)%100 == 0:
+                        print("[THREAD {}]: ({} / {}) images done".format(threading.current_thread().name, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation))
             return None
 
         if args.testrun:
