@@ -278,6 +278,7 @@ class dynaMOBuilder(object):
 
 
 def create_sample_animations(N=10):
+    train, train_labels, test, test_labels = get()
     for i in range(N):
         choice = np.random.choice(train.shape[0], 3)
         targets = train[choice].reshape([-1, 28, 28])
@@ -296,7 +297,7 @@ def create_sample_animations(N=10):
 if __name__ == "__main__":
 
     if args.interactive:
-        train, train_labels, test, test_labels  = get()
+        train, train_labels, test, test_labels = get()
 
         def resample():
             choice = np.random.choice(train.shape[0], 3)
