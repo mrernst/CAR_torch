@@ -130,28 +130,30 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         image = image.transpose((2, 0, 1))
-        return {'image': torch.from_numpy(image),
-                'target': torch.from_numpy(target)}
+        return {'image': torch.from_numpy(image).type(torch.float32),
+                'target': torch.from_numpy(target).type(torch.float32)}
 
 
 
 
-transformed_dataset = dynaMODataset(
-    root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/test/',
-    transform=transforms.Compose([
-                                   ToTensor() #,
-                                   # transforms.Normalize(
-                                   #  mean=[0.485, 0.456, 0.406],
-                                   #  std=[0.229, 0.224, 0.225])
-                                    ]))
+if __name__ == "__main__":
+
+    transformed_dataset = dynaMODataset(
+        root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/test/',
+        transform=transforms.Compose([
+                                       ToTensor() #,
+                                       # transforms.Normalize(
+                                       #  mean=[0.485, 0.456, 0.406],
+                                       #  std=[0.229, 0.224, 0.225])
+                                        ]))
 
 
-dataloader = DataLoader(transformed_dataset, batch_size=10,
-                        shuffle=True, num_workers=4)
+    dataloader = DataLoader(transformed_dataset, batch_size=10,
+                            shuffle=True, num_workers=4)
 
-for i_batch, sample_batched in enumerate(dataloader):
-    print(i_batch, sample_batched['image'].size(),
-          sample_batched['target'].size())
+    for i_batch, sample_batched in enumerate(dataloader):
+        print(i_batch, sample_batched['image'].size(),
+              sample_batched['target'].size())
 # _____________________________________________________________________________
 
 
