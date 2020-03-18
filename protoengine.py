@@ -44,6 +44,7 @@
 
 # standard libraries
 # -----
+from __future__ import division
 import os
 import numpy as np
 import matplotlib.pyplot as plt
@@ -64,7 +65,7 @@ import math
 # -----
 
 from datasets.dynaMO.dataset import dynaMODataset, ToTensor
-
+from utilities.convlstm import ConvLSTMCell, ConvLSTM
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -103,18 +104,19 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
 
         # modules
-        self.embedding = nn.Embedding(input_size, hidden_size)
         self.linear = nn.Linear(input_size, hidden_size, bias=True)
-        self.gru1 = nn.GRU(hidden_size, hidden_size)
+        self.gru1 = nn.GRU(hidden_size, hidden_size, batch_first=True)
 
     def forward(self, input, hidden):
-        embedded = self.linear(input.view(1, -1)).view(1, 1, -1)
-        output = embedded
+        input = input.view(input.shape[0], -1)
+        linear = self.linear(input)
+        linear = linear.view(input.shape[0], 1, -1)
+        output = linear
         output, hidden = self.gru1(output, hidden)
         return output, hidden
 
-    def initHidden(self):
-        return torch.zeros(1, 1, self.hidden_size, device=device)
+    def initHidden(self, batch_size):
+        return torch.zeros(1, batch_size, self.hidden_size, device=device)
 
 
 class AttentionDecoderRNN(nn.Module):
@@ -129,33 +131,41 @@ class AttentionDecoderRNN(nn.Module):
         self.max_length = max_length
 
         # modules
-        self.embedding = nn.Embedding(self.output_size, self.hidden_size)
+        self.linear = nn.Linear(self.output_size, self.hidden_size, bias=True)
+        # self.embedding = nn.Embedding(self.output_size, self.hidden_size)
         self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
         self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
         self.dropout = nn.Dropout(self.dropout_p)
-        self.gru = nn.GRU(self.hidden_size, self.hidden_size)
+        self.gru = nn.GRU(self.hidden_size, self.hidden_size, batch_first=True)
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
     def forward(self, input, hidden, encoder_outputs):
-        embedded = self.embedding(input).view(1, 1, -1)
+        #print('#########################')
+        # embedded = self.embedding(input).view(1, 1, -1)
+        # embedded = self.dropout(embedded)
+        embedded = torch.nn.functional.one_hot(input, 10).float()
+        embedded = self.linear(embedded)
         embedded = self.dropout(embedded)
-
+        #print('embedded', embedded.shape)
+        #print('hidden', hidden.shape)
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded[0], hidden[0]), 1)), dim=1)
+            self.attn(torch.cat((embedded[:,0], hidden[0]), 1)), dim=1)
+        #print('attn_weights', attn_weights.shape)
+        #print('encoder_outputs', encoder_outputs.shape)
         attn_applied = torch.bmm(attn_weights.unsqueeze(
-            0), encoder_outputs.unsqueeze(0))
-
-        output = torch.cat((embedded[0], attn_applied[0]), 1)
-        output = self.attn_combine(output).unsqueeze(0)
-
+            1), encoder_outputs)
+        #print('attn_applied', attn_applied.shape)
+        output = torch.cat((embedded[:,0], attn_applied[:,0]), 1)
+        output = self.attn_combine(output).unsqueeze(1)
+        #print('output', output.shape)
         output = F.relu(output)
         output, hidden = self.gru(output, hidden)
-
-        output = F.log_softmax(self.out(output[0]), dim=1)
+        #print('output', output.shape)
+        output = F.log_softmax(self.out(output[:,0]), dim=1)
         return output, hidden, attn_weights
 
     def initHidden(self):
-        return torch.zeros(1, 1, self.hidden_size, device=device)
+        return torch.zeros(1, batch_size, self.hidden_size, device=device)
 
 
 # -----------------
@@ -166,7 +176,7 @@ teacher_forcing_ratio = 0.5
 
 
 def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, decoder_optimizer, criterion, max_length):
-    encoder_hidden = encoder.initHidden()
+    encoder_hidden = encoder.initHidden(input_tensor.size(0))
 
     encoder_optimizer.zero_grad()
     decoder_optimizer.zero_grad()
@@ -174,8 +184,8 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     input_length = input_tensor.size(1)
     target_length = target_tensor.size(1)
 
-    encoder_outputs = torch.zeros(
-        max_length, encoder.hidden_size, device=device)
+    encoder_outputs = torch.zeros(input_tensor.size(0),
+        input_length, encoder.hidden_size, device=device)
 
     loss = 0
 
@@ -183,9 +193,11 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
         encoder_output, encoder_hidden = encoder(
             input_tensor[:, ei, :, :], encoder_hidden)
 
-        encoder_outputs[ei] = encoder_output[0, 0]
+        encoder_outputs[:,ei] = encoder_output[:,0]
 
-    decoder_input = torch.tensor([[0]], device=device)
+    #decoder_input = torch.tensor([[0]], device=device)
+    #decoder_input = torch.zeros(input_tensor.shape[0],10, device=device)
+    decoder_input = torch.zeros(input_tensor.shape[0],1, dtype=torch.int64, device=device)
 
     decoder_hidden = encoder_hidden
 
@@ -196,14 +208,14 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
             loss += criterion(decoder_output, target_tensor[:,di])
-            decoder_input = target_tensor[:,di]
+            decoder_input = target_tensor[:,di:di+1]
 
     else:
         for di in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
             topv, topi = decoder_output.topk(1)
-            decoder_input = topi.squeeze().detach()
+            decoder_input = topi #topi.squeeze().detach()
             loss += criterion(decoder_output, target_tensor[:,di])
 
     loss.backward()
@@ -215,16 +227,17 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
 
 
 def trainEpochs(dataloader, encoder, decoder, n_epochs, max_length, print_every=1000, plot_every=100, learning_rate=0.01):
-    start = time.time()
     plot_losses = []
     print_loss_total = 0
     plot_loss_total = 0
+    len_of_data = len(dataloader)
 
-    encoder_optimizer = optim.SGD(encoder.parameters(), lr=learning_rate)
-    decoder_optimizer = optim.SGD(decoder.parameters(), lr=learning_rate)
+    encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
+    decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
 
-    criterion = nn.NLLLoss()
+    criterion = nn.CrossEntropyLoss()
     for epoch in range(n_epochs):
+        start = time.time()
         for i_batch, sample_batched in enumerate(dataloader):
 
             loss = train(sample_batched['image'], sample_batched['target'], encoder, decoder,
@@ -236,8 +249,8 @@ def trainEpochs(dataloader, encoder, decoder, n_epochs, max_length, print_every=
             if i_batch % print_every == 0:
                 print_loss_avg = print_loss_total / print_every
                 print_loss_total = 0
-                print('%s (%d %d%%) %.4f' % (timeSince(start, i_batch+1 / len(dataloader)),
-                                             i_batch+1, i_batch+1 / len(dataloader) * 100, print_loss_avg))
+                print(" " * 80 + "\r" + '[Training:] E%d: %s (%d %d%%) %.4f' % (epoch, timeSince(start, (i_batch+1) / len_of_data),
+                                             i_batch, (i_batch+1) / len_of_data * 100, print_loss_avg), end="\r")
 
             if i_batch % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
@@ -248,8 +261,40 @@ def trainEpochs(dataloader, encoder, decoder, n_epochs, max_length, print_every=
     plt.show()
 
 
-def evaluate():
-    pass
+def evaluate(encoder, decoder, sample):
+    with torch.no_grad():
+        input_tensor = sample
+        input_length = input_tensor.size()[0]
+        encoder_hidden = encoder.initHidden()
+
+        encoder_outputs = torch.zeros(batch_size,
+            max_length, encoder.hidden_size, device=device)
+
+        for ei in range(input_length):
+            encoder_output, encoder_hidden = encoder(
+                input_tensor[:, ei, :, :], encoder_hidden)
+
+            encoder_outputs[:,ei] += encoder_output[:,0]
+
+        decoder_input = torch.zeros(batch_size, 1, dtype=torch.int64, device=device)
+
+        decoder_hidden = encoder_hidden
+        decoded_digits = []
+
+        decoder_attentions = torch.zeros(max_length, max_length)
+
+        for di in range(max_length):
+            decoder_output, decoder_hidden, decoder_attention = decoder(
+                decoder_input, decoder_hidden, encoder_outputs)
+            decoder_attentions[di] = decoder_attention.data
+            topv, topi = decoder_output.data.topk(1)
+
+            decoded_digits.append(topi)
+            decoder_input = topi #topi.squeeze().detach()
+
+    return decoded_digits, decoder_attentions[:di + 1]
+
+
 
 
 def showAttention():
@@ -264,23 +309,24 @@ def evaluateAndShowAttention():
 # Main Training Loop
 # -----------------
 
-hidden_size = 256
+hidden_size = 32
 max_length = 16
 encoder1 = EncoderRNN(32*32, hidden_size).to(device)
 attn_decoder1 = AttentionDecoderRNN(
-    hidden_size, 10,  max_length=max_length, dropout_p=0.1).to(device)
+    hidden_size, output_size=10,  max_length=max_length, dropout_p=0.1).to(device)
 
 
 dynaMo_transformed = dynaMODataset(
-    root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/test/',
+    root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/train/',
     transform=transforms.Compose([
         ToTensor()
     ]))
 
-dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=1,
-                        shuffle=True, num_workers=4)
+dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
+                        shuffle=True, num_workers=0, drop_last=True)
 
-trainEpochs(dynaMO_dataloader, encoder1, attn_decoder1, 10, max_length=max_length, print_every=5000)
+trainEpochs(dynaMO_dataloader, encoder1, attn_decoder1,
+            n_epochs=10, max_length=max_length, print_every=10)
 
 # for i_batch, sample_batched in enumerate(dynaMO_dataloader):
 #     print("hi")
