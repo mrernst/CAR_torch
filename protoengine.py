@@ -359,7 +359,7 @@ attn_decoder1 = AttentionDecoderRNN(
 
 
 dynaMo_transformed = dynaMODataset(
-    root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/train/',
+    root_dir='./datasets/dynaMO/image_files/train/',
     transform=transforms.Compose([
         ToTensor()
     ]))
@@ -368,7 +368,7 @@ dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
                         shuffle=True, num_workers=0, drop_last=True)
 
 trainEpochs(dynaMO_dataloader, encoder1, attn_decoder1, loss_writer,
-            n_epochs=10, max_length=max_length, print_every=100)
+            n_epochs=101, max_length=max_length, print_every=100)
 
 # for i_batch, sample_batched in enumerate(dynaMO_dataloader):
 #     print("hi")
