@@ -22,3 +22,5 @@ do
     echo "job $j"
     srun python3 protoengine.py
 done
+
+# TODO: Make this more elegant
