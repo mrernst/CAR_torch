@@ -44,19 +44,21 @@
 
 # standard libraries
 # -----
-from __future__ import division
-import os
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import torch
+import torch.nn as nn
+import torch.nn.functional as F
+from torch import optim
+
 from torchvision import transforms, utils
 from torch.utils.data import Dataset, DataLoader
-import torch.nn as nn
-from torch import optim
-import torch.nn.functional as F
-import random
+from torch.utils.tensorboard import SummaryWriter
 
+import matplotlib.pyplot as plt
+import matplotlib.ticker as ticker
+
+import os
+import random
 import time
 import math
 
@@ -87,6 +89,17 @@ def showPlot(points):
     loc = ticker.MultipleLocator(base=0.2)
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
+
+def matplotlib_imshow(img, one_channel=False):
+    if one_channel:
+        img = img.mean(dim=0)
+    img = img / 2 + 0.5
+    npimg = img.numpy()
+    if one_channel:
+        plt.imshow(npimg, cmap='Greys')
+    else:
+        plt.imshow(np.transpose(npimg, (1,2,0)))
+
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -188,7 +201,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
         input_length, encoder.hidden_size, device=device)
 
     loss = 0
-
+    accuracy = 0
     for ei in range(input_length):
         encoder_output, encoder_hidden = encoder(
             input_tensor[:, ei, :, :], encoder_hidden)
@@ -209,6 +222,9 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
                 decoder_input, decoder_hidden, encoder_outputs)
             loss += criterion(decoder_output, target_tensor[:,di])
             decoder_input = target_tensor[:,di:di+1]
+            topv, topi = decoder_output.topk(1)
+            accuracy += (topi == target_tensor[:,di:di+1]).sum(dim=0, dtype=torch.float64)
+
 
     else:
         for di in range(target_length):
@@ -217,19 +233,23 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
             topv, topi = decoder_output.topk(1)
             decoder_input = topi #topi.squeeze().detach()
             loss += criterion(decoder_output, target_tensor[:,di])
-
+            accuracy += (topi == target_tensor[:,di:di+1]).sum(dim=0, dtype=torch.float64)
+            #print(topi[0], target_tensor[0,di:di+1])
     loss.backward()
 
     encoder_optimizer.step()
     decoder_optimizer.step()
 
-    return loss.item() / target_length
+    return loss.item() / target_length, accuracy / (target_tensor.shape[0] * target_tensor.shape[1])
 
 
-def trainEpochs(dataloader, encoder, decoder, n_epochs, max_length, print_every=1000, plot_every=100, learning_rate=0.01):
+def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length, print_every=1000, plot_every=100, learning_rate=0.01):
     plot_losses = []
     print_loss_total = 0
+    print_accuracy_total = 0
     plot_loss_total = 0
+    plot_accuracy_total = 0
+
     len_of_data = len(dataloader)
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
@@ -240,23 +260,35 @@ def trainEpochs(dataloader, encoder, decoder, n_epochs, max_length, print_every=
         start = time.time()
         for i_batch, sample_batched in enumerate(dataloader):
 
-            loss = train(sample_batched['image'], sample_batched['target'], encoder, decoder,
+            loss, accuracy = train(sample_batched['image'], sample_batched['target'], encoder, decoder,
                          encoder_optimizer, decoder_optimizer, criterion, max_length)
 
             print_loss_total += loss
             plot_loss_total += loss
+            print_accuracy_total += accuracy
+            plot_accuracy_total += accuracy
+
 
             if i_batch % print_every == 0:
                 print_loss_avg = print_loss_total / print_every
                 print_loss_total = 0
-                print(" " * 80 + "\r" + '[Training:] E%d: %s (%d %d%%) %.4f' % (epoch, timeSince(start, (i_batch+1) / len_of_data),
-                                             i_batch, (i_batch+1) / len_of_data * 100, print_loss_avg), end="\r")
+                print_accuracy_avg = print_accuracy_total / print_every
+                print_accuracy_total = 0
+                print(" " * 80 + "\r" + '[Training:] E%d: %s (%d %d%%) %.4f %.4f' % (epoch, timeSince(start, (i_batch+1) / len_of_data),
+                                             i_batch, (i_batch+1) / len_of_data * 100, print_loss_avg, print_accuracy_avg), end="\r")
 
             if i_batch % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
-                plot_losses.append(plot_loss_avg)
-                plot_loss_total = 0
+                plot_accuracy_avg = plot_accuracy_total / plot_every
 
+                plot_losses.append(plot_loss_avg)
+                writer.add_scalar('training loss', plot_loss_avg, epoch * len(dataloader) + i_batch)
+                writer.add_scalar('training accuracy', plot_accuracy_avg, epoch * len(dataloader) + i_batch)
+
+                plot_loss_total = 0
+                plot_accuracy_total = 0
+
+    writer.close()
     showPlot(plot_losses)
     plt.show()
 
@@ -309,7 +341,9 @@ def evaluateAndShowAttention():
 # Main Training Loop
 # -----------------
 
-hidden_size = 32
+loss_writer = SummaryWriter('./experiments/protoengine_experiment_1/')
+
+hidden_size = 256
 max_length = 16
 encoder1 = EncoderRNN(32*32, hidden_size).to(device)
 attn_decoder1 = AttentionDecoderRNN(
@@ -325,8 +359,8 @@ dynaMo_transformed = dynaMODataset(
 dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
                         shuffle=True, num_workers=0, drop_last=True)
 
-trainEpochs(dynaMO_dataloader, encoder1, attn_decoder1,
-            n_epochs=10, max_length=max_length, print_every=10)
+trainEpochs(dynaMO_dataloader, encoder1, attn_decoder1, loss_writer,
+            n_epochs=10, max_length=max_length, print_every=100)
 
 # for i_batch, sample_batched in enumerate(dynaMO_dataloader):
 #     print("hi")
