@@ -10,7 +10,7 @@
 #SBATCH --job-name=protoengine_experiment_1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=mernst@fias.uni-frankfurt.de
-#SBATCH --output=/home/mernst/Desktop/output/noname_experiment_slurm_%j.out
+#SBATCH --output=/home/mernst/git/titan/experiments/protoengine_experiment_1/files/slurm_output/noname_experiment_slurm_%j.out
 #SBATCH --array=0%1
 #SBATCH --reservation triesch-shared
 
