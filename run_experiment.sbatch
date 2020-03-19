@@ -7,7 +7,7 @@
 #SBATCH --mem=10GB
 #SBATCH --gres=gpu:1
 #SBATCH --partition=sleuths
-#SBATCH --job-name=Seq2Seq
+#SBATCH --job-name=protoengine_experiment_1
 #SBATCH --mail-type=END
 #SBATCH --mail-user=mernst@fias.uni-frankfurt.de
 #SBATCH --output=/home/mernst/Desktop/output/noname_experiment_slurm_%j.out
