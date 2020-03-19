@@ -299,8 +299,6 @@ def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
             checkpoint(epoch, decoder, experiment_dir + 'decoder_', save_every)
 
     writer.close()
-    showPlot(plot_losses)
-    plt.show()
 
 
 def evaluate(encoder, decoder, sample):
