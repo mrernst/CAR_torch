@@ -100,7 +100,12 @@ def matplotlib_imshow(img, one_channel=False):
     else:
         plt.imshow(np.transpose(npimg, (1,2,0)))
 
-
+def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
+    model_out_path = experiment_dir + "model_epoch_{}.pth".format(epoch)
+    torch.save(model, model_out_path)
+    print("[Info:] Checkpoint saved to {}".format(model_out_path, end='\n'))
+    if (epoch > 0 and remove_last):
+        os.remove(experiment_dir + "model_epoch_{}.pth".format(epoch-save_every))
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
@@ -243,7 +248,9 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     return loss.item() / target_length, accuracy / (target_tensor.shape[0] * target_tensor.shape[1])
 
 
-def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length, print_every=1000, plot_every=100, learning_rate=0.01):
+def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
+                print_every=1000, plot_every=100, save_every=5, learning_rate=0.01,
+                experiment_dir='./experiments/protoengine_experiment_1/data/config0/'):
     plot_losses = []
     print_loss_total = 0
     print_accuracy_total = 0
@@ -287,6 +294,9 @@ def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length, prin
 
                 plot_loss_total = 0
                 plot_accuracy_total = 0
+        if epoch % save_every == 0:
+            checkpoint(epoch, encoder, experiment_dir + 'encoder_', save_every)
+            checkpoint(epoch, decoder, experiment_dir + 'decoder_', save_every)
 
     writer.close()
     showPlot(plot_losses)
@@ -341,7 +351,7 @@ def evaluateAndShowAttention():
 # Main Training Loop
 # -----------------
 
-loss_writer = SummaryWriter('./experiments/protoengine_experiment_1/')
+loss_writer = SummaryWriter('./experiments/protoengine_experiment_1/data/config0/')
 
 hidden_size = 256
 max_length = 16
