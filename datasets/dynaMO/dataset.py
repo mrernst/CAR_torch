@@ -57,6 +57,8 @@ from torchvision import transforms, utils
 # custom functions
 # -----
 
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
+
 # Standard Usecase
 # -----
 # For the standard usecase of having just one class you can use the built-in
@@ -130,9 +132,13 @@ class ToTensor(object):
         # numpy image: H x W x C
         # torch image: C X H X W
         image = image.transpose((2, 0, 1))
-        return {'image': torch.from_numpy(image).type(torch.float32),
-                'target': torch.from_numpy(target).type(torch.int64),
-                'single': torch.from_numpy(target[-1:]).type(torch.int64)}
+        # return {'image': torch.from_numpy(image).type(torch.float32),
+        #         'target': torch.from_numpy(target).type(torch.int64),
+        #         'single': torch.from_numpy(target[-1:]).type(torch.int64)}
+        return {'image': torch.tensor(image, dtype=torch.float32, device=device),
+                'target': torch.tensor(target, dtype=torch.int64, device=device),
+                'single': torch.tensor(target[-1], dtype=torch.int64, device=device)}
+
 
 
 

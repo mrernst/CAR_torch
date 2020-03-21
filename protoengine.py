@@ -122,7 +122,7 @@ class EncoderRNN(nn.Module):
         self.hidden_size = hidden_size
 
         # modules
-        self.linear = nn.Linear(input_size, hidden_size, bias=True).to(device)
+        self.linear = nn.Linear(input_size, hidden_size, bias=True)
         self.gru1 = nn.GRU(hidden_size, hidden_size, batch_first=True)
 
     def forward(self, input, hidden):
@@ -149,7 +149,7 @@ class AttentionDecoderRNN(nn.Module):
         self.max_length = max_length
 
         # modules
-        self.linear = nn.Linear(self.output_size, self.hidden_size, bias=True).to(device)
+        self.linear = nn.Linear(self.output_size, self.hidden_size, bias=True)
         # self.embedding = nn.Embedding(self.output_size, self.hidden_size)
         self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
         self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
