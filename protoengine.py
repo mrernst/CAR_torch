@@ -69,6 +69,7 @@ import math
 from datasets.dynaMO.dataset import dynaMODataset, ToTensor
 from utilities.convlstm import ConvLSTMCell, ConvLSTM
 
+
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
@@ -90,6 +91,7 @@ def showPlot(points):
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
 
+
 def matplotlib_imshow(img, one_channel=False):
     if one_channel:
         img = img.mean(dim=0)
@@ -98,20 +100,100 @@ def matplotlib_imshow(img, one_channel=False):
     if one_channel:
         plt.imshow(npimg, cmap='Greys')
     else:
-        plt.imshow(np.transpose(npimg, (1,2,0)))
+        plt.imshow(np.transpose(npimg, (1, 2, 0)))
+
 
 def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
     model_out_path = experiment_dir + "model_epoch_{}.pth".format(epoch)
     torch.save(model, model_out_path)
     print("[Info:] Checkpoint saved to {}".format(model_out_path, end='\n'))
     if (epoch > 0 and remove_last):
-        os.remove(experiment_dir + "model_epoch_{}.pth".format(epoch-save_every))
+        os.remove(experiment_dir +
+                  "model_epoch_{}.pth".format(epoch - save_every))
+
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # -----------------
 # Encoder and Decoder Classes of the network
 # -----------------
+
+
+class EncoderLSTMNetwork(nn.Module):
+    """docstring for EncoderRNN."""
+
+    def __init__(self, input_size, hidden_size):
+        super(EncoderLSTMNetwork, self).__init__()
+        # variables
+        self.hidden_size = hidden_size
+
+        # modules
+        self.linear = nn.Linear(input_size, hidden_size, bias=True)
+        self.lstm = nn.LSTM(hidden_size, hidden_size, 1, batch_first=True)
+
+    def forward(self, input, hidden):
+        input = input.view(input.shape[0], -1)
+        linear = self.linear(input)
+        linear = linear.view(input.shape[0], 1, -1)
+        output = linear
+        output, hidden = self.lstm(output, hidden)
+        return output, hidden
+
+    def initHidden(self, batch_size):
+        i = torch.zeros(1, batch_size, self.hidden_size, device=device)
+        return (i, i)
+
+
+class AttentionDecoderLSTMNetwork(nn.Module):
+    """docstring for AttentionDecoderRNN."""
+
+    def __init__(self, hidden_size, output_size, max_length, dropout_p=0.1):
+        super(AttentionDecoderLSTMNetwork, self).__init__()
+        # variables
+        self.hidden_size = hidden_size
+        self.output_size = output_size
+        self.dropout_p = dropout_p
+        self.max_length = max_length
+
+        # modules
+        self.linear = nn.Linear(self.output_size, self.hidden_size, bias=True)
+        # self.embedding = nn.Embedding(self.output_size, self.hidden_size)
+        self.attn = nn.Linear(self.hidden_size * 2, self.max_length)
+        self.attn_combine = nn.Linear(self.hidden_size * 2, self.hidden_size)
+        self.dropout = nn.Dropout(self.dropout_p)
+        self.lstm = nn.LSTM(
+            self.hidden_size, self.hidden_size, batch_first=True)
+        self.out = nn.Linear(self.hidden_size, self.output_size)
+
+    def forward(self, input, hidden, encoder_outputs):
+        # print('#########################')
+        # embedded = self.embedding(input).view(1, 1, -1)
+        # embedded = self.dropout(embedded)
+        embedded = torch.nn.functional.one_hot(input, 10).float()
+        embedded = self.linear(embedded)
+        embedded = self.dropout(embedded)
+        #print('embedded', embedded.shape)
+        #print('hidden', hidden.shape)
+        attn_weights = F.softmax(
+            self.attn(torch.cat((embedded[:, 0], hidden[0][0]), 1)), dim=1)
+        #print('attn_weights', attn_weights.shape)
+        #print('encoder_outputs', encoder_outputs.shape)
+        attn_applied = torch.bmm(attn_weights.unsqueeze(
+            1), encoder_outputs)
+        #print('attn_applied', attn_applied.shape)
+        output = torch.cat((embedded[:, 0], attn_applied[:, 0]), 1)
+        output = self.attn_combine(output).unsqueeze(1)
+        #print('output', output.shape)
+        output = F.relu(output)
+        output, hidden = self.lstm(output, hidden)
+        #print('output', output.shape)
+        output = F.log_softmax(self.out(output[:, 0]), dim=1)
+        return output, hidden, attn_weights
+
+    def initHidden(self, batch_size):
+        i = torch.zeros(1, batch_size, self.hidden_size, device=device)
+        return (i, i)
+
 
 class EncoderRNN(nn.Module):
     """docstring for EncoderRNN."""
@@ -158,7 +240,7 @@ class AttentionDecoderRNN(nn.Module):
         self.out = nn.Linear(self.hidden_size, self.output_size)
 
     def forward(self, input, hidden, encoder_outputs):
-        #print('#########################')
+        # print('#########################')
         # embedded = self.embedding(input).view(1, 1, -1)
         # embedded = self.dropout(embedded)
         embedded = torch.nn.functional.one_hot(input, 10).float()
@@ -167,19 +249,19 @@ class AttentionDecoderRNN(nn.Module):
         #print('embedded', embedded.shape)
         #print('hidden', hidden.shape)
         attn_weights = F.softmax(
-            self.attn(torch.cat((embedded[:,0], hidden[0]), 1)), dim=1)
+            self.attn(torch.cat((embedded[:, 0], hidden[0]), 1)), dim=1)
         #print('attn_weights', attn_weights.shape)
         #print('encoder_outputs', encoder_outputs.shape)
         attn_applied = torch.bmm(attn_weights.unsqueeze(
             1), encoder_outputs)
         #print('attn_applied', attn_applied.shape)
-        output = torch.cat((embedded[:,0], attn_applied[:,0]), 1)
+        output = torch.cat((embedded[:, 0], attn_applied[:, 0]), 1)
         output = self.attn_combine(output).unsqueeze(1)
         #print('output', output.shape)
         output = F.relu(output)
         output, hidden = self.gru(output, hidden)
         #print('output', output.shape)
-        output = F.log_softmax(self.out(output[:,0]), dim=1)
+        output = F.log_softmax(self.out(output[:, 0]), dim=1)
         return output, hidden, attn_weights
 
     def initHidden(self):
@@ -203,7 +285,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
     target_length = target_tensor.size(1)
 
     encoder_outputs = torch.zeros(input_tensor.size(0),
-        input_length, encoder.hidden_size, device=device)
+                                  input_length, encoder.hidden_size, device=device)
 
     loss = 0
     accuracy = 0
@@ -211,11 +293,12 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
         encoder_output, encoder_hidden = encoder(
             input_tensor[:, ei, :, :], encoder_hidden)
 
-        encoder_outputs[:,ei] = encoder_output[:,0]
+        encoder_outputs[:, ei] = encoder_output[:, 0]
 
     #decoder_input = torch.tensor([[0]], device=device)
     #decoder_input = torch.zeros(input_tensor.shape[0],10, device=device)
-    decoder_input = torch.zeros(input_tensor.shape[0],1, dtype=torch.int64, device=device)
+    decoder_input = torch.zeros(
+        input_tensor.shape[0], 1, dtype=torch.int64, device=device)
 
     decoder_hidden = encoder_hidden
 
@@ -225,20 +308,21 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer, deco
         for di in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
-            loss += criterion(decoder_output, target_tensor[:,di])
-            decoder_input = target_tensor[:,di:di+1]
+            loss += criterion(decoder_output, target_tensor[:, di])
+            decoder_input = target_tensor[:, di:di + 1]
             topv, topi = decoder_output.topk(1)
-            accuracy += (topi == target_tensor[:,di:di+1]).sum(dim=0, dtype=torch.float64)
-
+            accuracy += (topi == target_tensor[:, di:di + 1]
+                         ).sum(dim=0, dtype=torch.float64)
 
     else:
         for di in range(target_length):
             decoder_output, decoder_hidden, decoder_attention = decoder(
                 decoder_input, decoder_hidden, encoder_outputs)
             topv, topi = decoder_output.topk(1)
-            decoder_input = topi #topi.squeeze().detach()
-            loss += criterion(decoder_output, target_tensor[:,di])
-            accuracy += (topi == target_tensor[:,di:di+1]).sum(dim=0, dtype=torch.float64)
+            decoder_input = topi  # topi.squeeze().detach()
+            loss += criterion(decoder_output, target_tensor[:, di])
+            accuracy += (topi == target_tensor[:, di:di + 1]
+                         ).sum(dim=0, dtype=torch.float64)
             #print(topi[0], target_tensor[0,di:di+1])
     loss.backward()
 
@@ -268,29 +352,30 @@ def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
         for i_batch, sample_batched in enumerate(dataloader):
 
             loss, accuracy = train(sample_batched['image'], sample_batched['target'], encoder, decoder,
-                         encoder_optimizer, decoder_optimizer, criterion, max_length)
+                                   encoder_optimizer, decoder_optimizer, criterion, max_length)
 
             print_loss_total += loss
             plot_loss_total += loss
             print_accuracy_total += accuracy
             plot_accuracy_total += accuracy
 
-
             if i_batch % print_every == 0:
                 print_loss_avg = print_loss_total / print_every
                 print_loss_total = 0
                 print_accuracy_avg = print_accuracy_total / print_every
                 print_accuracy_total = 0
-                print(" " * 80 + "\r" + '[Training:] E%d: %s (%d %d%%) %.4f %.4f' % (epoch, timeSince(start, (i_batch+1) / len_of_data),
-                                             i_batch, (i_batch+1) / len_of_data * 100, print_loss_avg, print_accuracy_avg), end="\r")
+                print(" " * 80 + "\r" + '[Training:] E%d: %s (%d %d%%) %.4f %.4f' % (epoch, timeSince(start, (i_batch + 1) / len_of_data),
+                                                                                     i_batch, (i_batch + 1) / len_of_data * 100, print_loss_avg, print_accuracy_avg), end="\r")
 
             if i_batch % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
                 plot_accuracy_avg = plot_accuracy_total / plot_every
 
                 plot_losses.append(plot_loss_avg)
-                writer.add_scalar('training loss', plot_loss_avg, epoch * len(dataloader) + i_batch)
-                writer.add_scalar('training accuracy', plot_accuracy_avg, epoch * len(dataloader) + i_batch)
+                writer.add_scalar('training loss', plot_loss_avg,
+                                  epoch * len(dataloader) + i_batch)
+                writer.add_scalar(
+                    'training accuracy', plot_accuracy_avg, epoch * len(dataloader) + i_batch)
 
                 plot_loss_total = 0
                 plot_accuracy_total = 0
@@ -308,15 +393,16 @@ def evaluate(encoder, decoder, sample):
         encoder_hidden = encoder.initHidden()
 
         encoder_outputs = torch.zeros(batch_size,
-            max_length, encoder.hidden_size, device=device)
+                                      max_length, encoder.hidden_size, device=device)
 
         for ei in range(input_length):
             encoder_output, encoder_hidden = encoder(
                 input_tensor[:, ei, :, :], encoder_hidden)
 
-            encoder_outputs[:,ei] += encoder_output[:,0]
+            encoder_outputs[:, ei] += encoder_output[:, 0]
 
-        decoder_input = torch.zeros(batch_size, 1, dtype=torch.int64, device=device)
+        decoder_input = torch.zeros(
+            batch_size, 1, dtype=torch.int64, device=device)
 
         decoder_hidden = encoder_hidden
         decoded_digits = []
@@ -330,11 +416,9 @@ def evaluate(encoder, decoder, sample):
             topv, topi = decoder_output.data.topk(1)
 
             decoded_digits.append(topi)
-            decoder_input = topi #topi.squeeze().detach()
+            decoder_input = topi  # topi.squeeze().detach()
 
     return decoded_digits, decoder_attentions[:di + 1]
-
-
 
 
 def showAttention():
@@ -349,12 +433,16 @@ def evaluateAndShowAttention():
 # Main Training Loop
 # -----------------
 
-loss_writer = SummaryWriter('./experiments/protoengine_experiment_1/data/config0/')
+loss_writer = SummaryWriter(
+    './experiments/protoengine_experiment_1/data/config0/')
 
 hidden_size = 256
 max_length = 16
-encoder1 = EncoderRNN(32*32, hidden_size).to(device)
+encoder1 = EncoderRNN(32 * 32, hidden_size).to(device)
 attn_decoder1 = AttentionDecoderRNN(
+    hidden_size, output_size=10,  max_length=max_length, dropout_p=0.1).to(device)
+encoder2 = EncoderLSTMNetwork(32 * 32, hidden_size).to(device)
+attn_decoder2 = AttentionDecoderLSTMNetwork(
     hidden_size, output_size=10,  max_length=max_length, dropout_p=0.1).to(device)
 
 
@@ -365,9 +453,9 @@ dynaMo_transformed = dynaMODataset(
     ]))
 
 dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
-                        shuffle=True, num_workers=0, drop_last=True)
+                               shuffle=True, num_workers=0, drop_last=True)
 
-trainEpochs(dynaMO_dataloader, encoder1, attn_decoder1, loss_writer,
+trainEpochs(dynaMO_dataloader, encoder2, attn_decoder2, loss_writer,
             n_epochs=101, max_length=max_length, print_every=100)
 
 # for i_batch, sample_batched in enumerate(dynaMO_dataloader):
