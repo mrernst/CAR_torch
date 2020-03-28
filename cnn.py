@@ -95,28 +95,55 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Encoder and Decoder Classes of the network
 # -----------------
 
-class StandardCNN(nn.Module):
+class Lenet5(nn.Module):
     def __init__(self):
         super(StandardCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3)
-        self.pool1 = nn.MaxPool2d(2, 2)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 32, 3)
-        self.pool2 = nn.MaxPool2d(2, 2)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.fc = nn.Linear(32 * 6 * 6, 10) #32*6*6
+        self.conv1 = nn.Conv2d(1, 6, 8, padding=4)
+        self.pool1 = nn.MaxPool2d(4, 2, padding=1)
+        self.bn1 = nn.BatchNorm2d(6)
+        self.conv2 = nn.Conv2d(6, 16, 8, padding=4)
+        self.pool2 = nn.MaxPool2d(4, 2, padding=1)
+        self.bn2 = nn.BatchNorm2d(16)
+        self.fc1 = nn.Linear(16 * 7 * 7, 120) #32*6*6
+        self.fc2 = nn.Linear(120, 10) #32*6*6
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        # print(x.shape)
+        #print(x.shape)
         x = self.pool2(F.relu(self.bn2(self.conv2(x))))
+        #print(x.shape)
+
+        x = x.view(-1, 16 * 7 * 7)
+        #print(x.shape)
+
+        x = F.relu(self.fc1(x))
+        x = F.softmax(self.fc2(x), 1)
         # print(x.shape)
 
-        x = x.view(-1, 32 * 6 * 6)
-        # print(x.shape)
+        return x
 
-        x = F.softmax(self.fc(x), 1)
-        # print(x.shape)
+class B_Network(nn.Module):
+    def __init__(self):
+        super(B_Network, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
+        self.pool1 = nn.MaxPool2d(2, 2, padding=0)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.pool2 = nn.MaxPool2d(2, 2, padding=0)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.fc1 = nn.Linear(32 * 7 * 7, 10)
+
+    def forward(self, x):
+        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
+        #print(x.shape)
+        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
+        #print(x.shape)
+
+        x = x.view(-1, 32 * 7 * 7)
+        #print(x.shape)
+
+        x = F.softmax(self.fc1(x), 1)
+        #print(x.shape)
 
         return x
 
@@ -142,28 +169,46 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
 
     loss.backward()
     optimizer.step()
+    loss = loss/topi.shape[0] #average loss per item
     return loss.item(), accuracy.item()
 
 
-def trainEpochs(dataloader, network, n_epochs, print_every=1000, plot_every=100, learning_rate=0.01):
+def test(test_loader, network, criterion, epoch):
+    loss = 0
+    with torch.no_grad():
+        for i, data in enumerate(test_loader):
+            input_tensor, target_tensor = data
+            network_output = network(input_tensor)
+            loss += criterion(network_output, target_tensor) / test_loader.batch_size
+            topv, topi = network_output.topk(1)
+            accuracy = (topi == target_tensor.unsqueeze(1)).sum(dim=0, dtype=torch.float64)/topi.shape[0]
+
+    print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
+          loss/i, accuracy), end="\n")
+    return loss, accuracy
+
+
+def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, test_every=1, plot_every=100, learning_rate=0.001):
     plot_losses = []
     print_loss_total = 0
     print_accuracy_total = 0
     plot_loss_total = 0
-    len_of_data = len(dataloader)
+    len_of_data = len(train_loader)
 
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
     criterion = nn.CrossEntropyLoss()
 
 
     for epoch in range(n_epochs):
-        start = time.time()
-        for i_batch, sample_batched in enumerate(dataloader):
+        if epoch % test_every == 0:
+            test_loss, test_accurary = test(test_loader, network, criterion, epoch)
 
-            loss, accuracy = train(sample_batched['image'], sample_batched['single'], network,
+        start = time.time()
+        for i_batch, sample_batched in enumerate(train_loader):
+
+            loss, accuracy = train(sample_batched[0], sample_batched[1], network,
                          optimizer, criterion)
-            # loss, accuracy = train(sample_batched[0], sample_batched[1], network,
-            #              optimizer, criterion)
+
 
             print_loss_total += loss
             plot_loss_total += loss
@@ -182,6 +227,7 @@ def trainEpochs(dataloader, network, n_epochs, print_every=1000, plot_every=100,
                 plot_losses.append(plot_loss_avg)
                 plot_loss_total = 0
 
+
     showPlot(plot_losses)
     plt.show()
 
@@ -191,37 +237,25 @@ def trainEpochs(dataloader, network, n_epochs, print_every=1000, plot_every=100,
 # -----------------
 
 # Training dataset
-cnn = StandardCNN().to(device)
-dynaMo_transformed = dynaMODataset(
-    root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/train/',
-    transform=transforms.Compose([
-        ToTensor()
-    ]))
+#cnn = Lenet5().to(device)
+cnn = B_Network().to(device)
+# Training dataset
+train_loader = torch.utils.data.DataLoader(
+    datasets.MNIST(root='./', train=True, download=True,
+                   transform=transforms.Compose([
+                       transforms.ToTensor(),
+                       transforms.Normalize((0.,), (1.,))
+                   ])), batch_size=100, shuffle=True, num_workers=0)
 
-dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
-                        shuffle=True, num_workers=0, drop_last=True)
+# Test dataset
+test_loader = torch.utils.data.DataLoader(
+    datasets.MNIST(root='./', train=False, transform=transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.,), (1.,))
+    ])), batch_size=100, shuffle=True, num_workers=0)
 
+trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=100, test_every=1)
 
-
-trainEpochs(dynaMO_dataloader, cnn, n_epochs=10, print_every=100)
-
-
-# # Training dataset
-# cnn = StandardCNN().to(device)
-# mnist_loader = torch.utils.data.DataLoader(
-#     datasets.MNIST(root='./', train=True, download=True,
-#                    transform=transforms.Compose([
-#                        transforms.ToTensor(),
-#                        transforms.Normalize((0.,), (1.,))
-#                    ])), batch_size=100, shuffle=True, num_workers=4)
-
-
-#trainEpochs(mnist_loader, cnn, n_epochs=10, print_every=10)
-
-# for i_batch, sample_batched in enumerate(dynaMO_dataloader):
-#     print("hi")
-#    criterion = nn.NLLLoss()
-#criterion(decoder_output, target_tensor[:,di])
 
 # _____________________________________________________________________________
 
