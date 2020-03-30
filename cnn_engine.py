@@ -67,6 +67,7 @@ import math
 from datasets.dynaMO.dataset import dynaMODataset, ToTensor
 from utilities.convlstm import ConvLSTMCell, ConvLSTM
 
+
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
@@ -95,6 +96,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # Encoder and Decoder Classes of the network
 # -----------------
 
+
 class Lenet5(nn.Module):
     def __init__(self):
         super(StandardCNN, self).__init__()
@@ -104,23 +106,24 @@ class Lenet5(nn.Module):
         self.conv2 = nn.Conv2d(6, 16, 8, padding=4)
         self.pool2 = nn.MaxPool2d(4, 2, padding=1)
         self.bn2 = nn.BatchNorm2d(16)
-        self.fc1 = nn.Linear(16 * 7 * 7, 120) #32*6*6
-        self.fc2 = nn.Linear(120, 10) #32*6*6
+        self.fc1 = nn.Linear(16 * 7 * 7, 120)  # 32*6*6
+        self.fc2 = nn.Linear(120, 10)  # 32*6*6
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        #print(x.shape)
+        # print(x.shape)
         x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        #print(x.shape)
+        # print(x.shape)
 
         x = x.view(-1, 16 * 7 * 7)
-        #print(x.shape)
+        # print(x.shape)
 
         x = F.relu(self.fc1(x))
         x = F.softmax(self.fc2(x), 1)
         # print(x.shape)
 
         return x
+
 
 class B_Network(nn.Module):
     def __init__(self):
@@ -135,15 +138,15 @@ class B_Network(nn.Module):
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        #print(x.shape)
+        # print(x.shape)
         x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        #print(x.shape)
+        # print(x.shape)
 
         x = x.view(-1, 32 * 7 * 7)
-        #print(x.shape)
+        # print(x.shape)
 
         x = F.softmax(self.fc1(x), 1)
-        #print(x.shape)
+        # print(x.shape)
 
         return x
 
@@ -152,24 +155,24 @@ class B_Network(nn.Module):
 # -----------------
 
 
-
 def train(input_tensor, target_tensor, network, optimizer, criterion):
 
     optimizer.zero_grad()
 
     loss = 0
 
-    input_tensor = input_tensor[:,0:1,:,:]
+    input_tensor = input_tensor[:, 0:1, :, :]
     network_output = network(input_tensor)
     if len(target_tensor.shape) > 1:
         target_tensor = target_tensor.squeeze()
     loss += criterion(network_output, target_tensor)
     topv, topi = network_output.topk(1)
-    accuracy = (topi == target_tensor.unsqueeze(1)).sum(dim=0, dtype=torch.float64)/topi.shape[0]
+    accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+        dim=0, dtype=torch.float64) / topi.shape[0]
 
     loss.backward()
     optimizer.step()
-    loss = loss/topi.shape[0] #average loss per item
+    loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
 
 
@@ -179,12 +182,14 @@ def test(test_loader, network, criterion, epoch):
         for i, data in enumerate(test_loader):
             input_tensor, target_tensor = data
             network_output = network(input_tensor)
-            loss += criterion(network_output, target_tensor) / test_loader.batch_size
+            loss += criterion(network_output, target_tensor) / \
+                test_loader.batch_size
             topv, topi = network_output.topk(1)
-            accuracy = (topi == target_tensor.unsqueeze(1)).sum(dim=0, dtype=torch.float64)/topi.shape[0]
+            accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+                dim=0, dtype=torch.float64) / topi.shape[0]
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
-          loss/i, accuracy), end="\n")
+                                                           loss / i, accuracy), end="\n")
     return loss, accuracy
 
 
@@ -198,17 +203,16 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
     criterion = nn.CrossEntropyLoss()
 
-
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test(test_loader, network, criterion, epoch)
+            test_loss, test_accurary = test(test_loader, network, criterion,
+                                            epoch)
 
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train(sample_batched[0], sample_batched[1], network,
-                         optimizer, criterion)
-
+            loss, accuracy = train(sample_batched[0], sample_batched[1],
+                                   network, optimizer, criterion)
 
             print_loss_total += loss
             plot_loss_total += loss
@@ -219,14 +223,16 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
                 print_loss_total = 0
                 print_accuracy_avg = print_accuracy_total / print_every
                 print_accuracy_total = 0
-                print(" " * 80 + "\r" + '[Training:] E%d: %s (%d %d%%) %.4f %.4f' % (epoch, timeSince(start, (i_batch+1) / len_of_data),
-                                             i_batch, (i_batch+1) / len_of_data * 100, print_loss_avg, print_accuracy_avg), end="\r")
+                print(" " * 80 + "\r" +
+                      '[Training:] E%d: %s (%d %d%%) %.4f %.4f'
+                      % (epoch, timeSince(start, (i_batch + 1) / len_of_data),
+                          i_batch, (i_batch + 1) / len_of_data * 100,
+                          print_loss_avg, print_accuracy_avg), end="\r")
 
             if i_batch % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
                 plot_losses.append(plot_loss_avg)
                 plot_loss_total = 0
-
 
     showPlot(plot_losses)
     plt.show()
@@ -237,7 +243,7 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 # -----------------
 
 # Training dataset
-#cnn = Lenet5().to(device)
+# cnn = Lenet5().to(device)
 cnn = B_Network().to(device)
 # Training dataset
 train_loader = torch.utils.data.DataLoader(
@@ -254,7 +260,8 @@ test_loader = torch.utils.data.DataLoader(
         transforms.Normalize((0.,), (1.,))
     ])), batch_size=100, shuffle=True, num_workers=0)
 
-trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=100, test_every=1)
+trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=100,
+            test_every=1)
 
 
 # _____________________________________________________________________________
