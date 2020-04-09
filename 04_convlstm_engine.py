@@ -377,7 +377,7 @@ dynaMo_transformed = dynaMODataset(
         ToTensor()
     ]))
 
-dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
+dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=50,
                                shuffle=True, num_workers=0, drop_last=True)
 
 trainEpochs(dynaMO_dataloader, encoder, predictor, loss_writer,
