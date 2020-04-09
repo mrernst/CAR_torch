@@ -377,7 +377,7 @@ dynaMo_transformed = dynaMODataset(
     ]))
 
 dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
-                               shuffle=True, num_workers=2, drop_last=True)
+                               shuffle=True, num_workers=0, drop_last=True)
 
 trainEpochs(dynaMO_dataloader, encoder, predictor, loss_writer,
             n_epochs=1, max_length=max_length, print_every=10, plot_every=10)
