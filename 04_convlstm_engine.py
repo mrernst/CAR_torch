@@ -364,9 +364,9 @@ predictor = DecoderNetwork(input_dim=16, hidden_dim=16, kernel_size=(5, 5), num_
                            batch_first=True, bias=True,
                            return_all_layers=True).to(device)
 
-# encoder.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/encoder.model'))
+# encoder.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/encoder.model', map_location=torch.device('cpu')))
 # encoder.eval()
-# predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model'))
+# predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model', map_location=torch.device('cpu')))
 # predictor.eval()
 # evaluate(encoder, predictor, torch.randn([1,16,32,32]))
 
