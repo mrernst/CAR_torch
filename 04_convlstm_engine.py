@@ -306,7 +306,7 @@ def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
     writer.close()
 
 
-def evaluate(encoder, decoder, sample, predict_for=None):
+def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=False):
     with torch.no_grad():
 
         #encoder_hidden = encoder.initHidden(input_tensor.size(0))
@@ -319,7 +319,6 @@ def evaluate(encoder, decoder, sample, predict_for=None):
         accuracy = 0
         encoder_output, encoder_hidden = encoder(input_tensor)
 
-        use_teacher_forcing = False # !
         b, t, c, h, w = ground_truth.shape
         if predict_for:
             ground_truth = torch.zeros([b, predict_for, c, h, w])
@@ -336,14 +335,14 @@ def evaluate(encoder, decoder, sample, predict_for=None):
             img = (img.mean(dim=0) / 2 + 0.5).numpy()
             im.set_array(img)
             fig.canvas.draw()
-            plt.pause(.15)
+            plt.pause(.05)
         for step in range(predict_for):
             img = decoder_output[0,step,0:1,:,:]
             img = (img - img.min())/(img.max() - img.min())*255.
             img = (img.mean(dim=0) / 2 + 0.5).numpy()
             im.set_array(img)
             fig.canvas.draw()
-            plt.pause(.15)
+            plt.pause(.05)
 
     return decoder_output
 
@@ -356,11 +355,13 @@ loss_writer = SummaryWriter(
     './experiments/convlstm_experiment_1/data/config0/')
 
 max_length = 20
+UNITS=64
+LAYERS=2
 
-encoder = ConvLSTM(input_dim=1, hidden_dim=16, kernel_size=(5, 5), num_layers=2,
+encoder = ConvLSTM(input_dim=1, hidden_dim=UNITS, kernel_size=(5, 5), num_layers=LAYERS,
                    batch_first=True, bias=True,
                    return_all_layers=True).to(device)
-predictor = DecoderNetwork(input_dim=16, hidden_dim=16, kernel_size=(5, 5), num_layers=2,
+predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5), num_layers=LAYERS,
                            batch_first=True, bias=True,
                            return_all_layers=True).to(device)
 
@@ -368,7 +369,7 @@ predictor = DecoderNetwork(input_dim=16, hidden_dim=16, kernel_size=(5, 5), num_
 # encoder.eval()
 # predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model', map_location=torch.device('cpu')))
 # predictor.eval()
-# evaluate(encoder, predictor, torch.randn([1,16,32,32]))
+# out = evaluate(encoder, predictor, torch.randn([1,16,32,32]))
 
 dynaMo_transformed = dynaMODataset(
     root_dir='./datasets/dynaMO/image_files/train/',
@@ -380,7 +381,7 @@ dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=100,
                                shuffle=True, num_workers=0, drop_last=True)
 
 trainEpochs(dynaMO_dataloader, encoder, predictor, loss_writer,
-            n_epochs=1, max_length=max_length, print_every=10, plot_every=10)
+            n_epochs=10, max_length=max_length, print_every=10, plot_every=100)
 
 
 torch.save(encoder.state_dict(), './experiments/convlstm_experiment_1/data/config0/models/encoder.model')
