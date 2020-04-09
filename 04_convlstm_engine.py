@@ -364,6 +364,12 @@ predictor = DecoderNetwork(input_dim=16, hidden_dim=16, kernel_size=(5, 5), num_
                            batch_first=True, bias=True,
                            return_all_layers=True).to(device)
 
+# encoder.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/encoder.model'))
+# encoder.eval()
+# predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model'))
+# predictor.eval()
+# evaluate(encoder, predictor, torch.randn([1,16,32,32]))
+
 dynaMo_transformed = dynaMODataset(
     root_dir='./datasets/dynaMO/image_files/train/',
     transform=transforms.Compose([
@@ -381,11 +387,7 @@ torch.save(encoder.state_dict(), './experiments/convlstm_experiment_1/data/confi
 torch.save(predictor.state_dict(), './experiments/convlstm_experiment_1/data/config0/models/predictor.model')
 
 
-# encoder.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/encoder.model'))
-# encoder.eval()
-# predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model'))
-# predictor.eval()
-# evaluate(encoder, predictor, torch.randn([1,16,32,32]))
+
 # this is just for evaluation purposes..
 # for general checkpointing more needs to be saved, i.e.
 # ----
