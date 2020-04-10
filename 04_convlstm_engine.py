@@ -381,7 +381,7 @@ dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=50,
                                shuffle=True, num_workers=0, drop_last=True)
 
 trainEpochs(dynaMO_dataloader, encoder, predictor, loss_writer,
-            n_epochs=10, max_length=max_length, print_every=10, plot_every=100)
+            n_epochs=10, max_length=max_length, print_every=100, plot_every=100)
 
 
 torch.save(encoder.state_dict(), './experiments/convlstm_experiment_1/data/config0/models/encoder.model')
