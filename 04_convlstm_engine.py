@@ -374,10 +374,7 @@ predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5)
 dynaMo_transformed = dynaMODataset(
     root_dir='./datasets/dynaMO/image_files/train/',
     transform=transforms.Compose([
-        ToTensor(),
-        transforms.Normalize(
-            mean=0,
-            std=1)
+        ToTensor()
     ]))
 
 dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=50,

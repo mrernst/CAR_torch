@@ -131,10 +131,10 @@ class ToTensor(object):
         # swap color axis because
         # numpy image: H x W x C
         # torch image: C X H X W
-        image = image.transpose((2, 0, 1))
+        image = image.transpose((2, 0, 1)) / (255./2) - 1 # crude normalization
         # return {'image': torch.from_numpy(image).type(torch.float32),
         #         'target': torch.from_numpy(target).type(torch.int64),
-        #         'single': torch.from_numpy(target[-1:]).type(torch.int64)}
+        #         'single': torch.from_numpy(target[-1:]).type(torch.int64)} #transforms.functional.normalize(tensor, 0, 1, inplace=False)
         return {'image': torch.tensor(image, dtype=torch.float32, device=device),
                 'target': torch.tensor(target, dtype=torch.int64, device=device),
                 'single': torch.tensor(target[-1], dtype=torch.int64, device=device)}
@@ -148,10 +148,10 @@ if __name__ == "__main__":
     transformed_dataset = dynaMODataset(
         root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/test/',
         transform=transforms.Compose([
-                                       ToTensor(),
-                                       transforms.Normalize(
-                                           mean=0,
-                                           std=1)
+                                       ToTensor()  # ,
+                                       # transforms.Normalize(
+                                       #     mean=0,
+                                       #     std=[])
                                         ]))
 
 
