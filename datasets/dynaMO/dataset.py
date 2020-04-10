@@ -148,10 +148,10 @@ if __name__ == "__main__":
     transformed_dataset = dynaMODataset(
         root_dir='/Users/markus/Research/Code/titan/datasets/dynaMO/image_files/test/',
         transform=transforms.Compose([
-                                       ToTensor() #,
-                                       # transforms.Normalize(
-                                       #  mean=[0.485, 0.456, 0.406],
-                                       #  std=[0.229, 0.224, 0.225])
+                                       ToTensor(),
+                                       transforms.Normalize(
+                                           mean=0,
+                                           std=1)
                                         ]))
 
 
