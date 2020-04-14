@@ -310,7 +310,7 @@ def trainEpochs(train_dataloader, test_dataloader, encoder, decoder, writer, n_e
     writer.close()
 
 
-def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=False):
+def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=False, pause=.05):
     with torch.no_grad():
 
         #encoder_hidden = encoder.initHidden(input_tensor.size(0))
@@ -339,14 +339,14 @@ def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=Fal
             img = (img.mean(dim=0) / 2 + 0.5).numpy()
             im.set_array(img)
             fig.canvas.draw()
-            plt.pause(.05)
+            plt.pause(pause)
         for step in range(predict_for):
             img = decoder_output[0,step,0:1,:,:]
             #img = (img - img.min())/(img.max() - img.min())*255.
             img = (img.mean(dim=0) / 2 + 0.5).numpy()
             im.set_array(img)
             fig.canvas.draw()
-            plt.pause(.05)
+            plt.pause(pause)
 
     return decoder_output
 
@@ -401,7 +401,7 @@ predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5)
 # encoder.eval()
 # predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model', map_location=torch.device('cpu')))
 # predictor.eval()
-# out = evaluate(encoder, predictor, torch.randn([1,16,32,32]))
+# out = evaluate(encoder, predictor, torch.clamp(torch.randn([1,16,32,32]), -1., 1.), predict_for=100)
 
 
 dynaMo_train_transformed = dynaMODataset(
