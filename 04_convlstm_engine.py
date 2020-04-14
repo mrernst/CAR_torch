@@ -367,15 +367,15 @@ def test(dataloader, encoder, decoder, criterion, epoch, writer, experiment_dir)
             loss += criterion(decoder_output, ground_truth)
 
         print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
-              loss/i_batch, accuracy/i_batch), end="\r")
+              loss/(i_batch+1), accuracy/(i_batch+1)), end="\r")
         writer.add_scalar('testing/loss', loss/(i_batch + 1),
-                          epoch * len(dataloader) + i_batch)
+                          epoch * len(dataloader))
         writer.add_scalar(
             'testing/accuracy', accuracy/(i_batch + 1), epoch * len(dataloader) + i_batch)
         sample = torch.stack([decoder_output[0], ground_truth[0]], dim=0)
         b,t,c,h,w = sample.shape
         img_grid = torchvision.utils.make_grid(sample.view([b,c,t*h,w]), nrow=2, normalize=True, scale_each=True)
-        writer.add_image('testing/sample', img_grid, epoch * len(dataloader) + i_batch)
+        writer.add_image('testing/sample', img_grid, epoch * len(dataloader))
 
     pass
 
