@@ -367,7 +367,7 @@ def test(dataloader, encoder, decoder, criterion, epoch, writer, experiment_dir)
             loss += criterion(decoder_output, ground_truth)
 
         print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
-              print_loss_avg, print_accuracy_avg), end="\r")
+              loss/i_batch, accuracy/i_batch), end="\r")
         writer.add_scalar('testing/loss', loss/(i_batch + 1),
                           epoch * len(dataloader) + i_batch)
         writer.add_scalar(
