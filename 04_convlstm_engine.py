@@ -245,7 +245,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer,
     return loss.item(), accuracy, torch.stack([decoder_output[0], ground_truth[0]], dim=0)
 
 
-def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
+def trainEpochs(train_dataloader, test_dataloader, encoder, decoder, writer, n_epochs, max_length, test_every=1,
                 print_every=1, plot_every=100, save_every=5, learning_rate=0.001,
                 experiment_dir='./experiments/protoengine_experiment_1/data/config0/'):
     plot_losses = []
@@ -254,16 +254,20 @@ def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
     plot_loss_total = 0
     plot_accuracy_total = 0
 
-    len_of_data = len(dataloader)
+    len_of_data = len(train_dataloader)
 
     encoder_optimizer = optim.Adam(encoder.parameters(), lr=learning_rate)
     decoder_optimizer = optim.Adam(decoder.parameters(), lr=learning_rate)
 
     criterion = nn.CrossEntropyLoss()
     criterion = nn.MSELoss()
+
     for epoch in range(n_epochs):
         start = time.time()
-        for i_batch, sample_batched in enumerate(dataloader):
+        if epoch % test_every == 0:
+            test(test_dataloader, encoder, decoder, criterion, epoch, writer, experiment_dir)
+
+        for i_batch, sample_batched in enumerate(train_dataloader):
 
             loss, accuracy, sample = train(sample_batched['image'], sample_batched['target'], encoder, decoder,
                                    encoder_optimizer, decoder_optimizer, criterion, max_length)
@@ -286,17 +290,17 @@ def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
                 plot_accuracy_avg = plot_accuracy_total / plot_every
 
                 plot_losses.append(plot_loss_avg)
-                writer.add_scalar('training loss', plot_loss_avg,
-                                  epoch * len(dataloader) + i_batch)
+                writer.add_scalar('training/loss', plot_loss_avg,
+                                  epoch * len(train_dataloader) + i_batch)
                 writer.add_scalar(
-                    'training accuracy', plot_accuracy_avg, epoch * len(dataloader) + i_batch)
+                    'training/accuracy', plot_accuracy_avg, epoch * len(train_dataloader) + i_batch)
                 b,t,c,h,w = sample.shape
                 #print(sample.view([b,c,h,t*w]).shape)
                 img_grid = torchvision.utils.make_grid(sample.view([b,c,t*h,w]), nrow=2, normalize=True, scale_each=True)
                 # npimg = img_grid.detach().numpy()
                 # plt.imshow(np.transpose(npimg, (1,2,0)))
                 # plt.show()
-                writer.add_image('sample', img_grid, epoch * len(dataloader) + i_batch)
+                writer.add_image('training/sample', img_grid, epoch * len(train_dataloader) + i_batch)
                 plot_loss_total = 0
                 plot_accuracy_total = 0
         if epoch % save_every == 0:
@@ -338,7 +342,7 @@ def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=Fal
             plt.pause(.05)
         for step in range(predict_for):
             img = decoder_output[0,step,0:1,:,:]
-            img = (img - img.min())/(img.max() - img.min())*255.
+            #img = (img - img.min())/(img.max() - img.min())*255.
             img = (img.mean(dim=0) / 2 + 0.5).numpy()
             im.set_array(img)
             fig.canvas.draw()
@@ -346,6 +350,34 @@ def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=Fal
 
     return decoder_output
 
+
+def test(dataloader, encoder, decoder, criterion, epoch, writer, experiment_dir):
+    with torch.no_grad():
+        loss = 0
+        accuracy = 0
+        len_of_data = len(dataloader)
+        use_teacher_forcing = False
+
+        for i_batch, sample_batched in enumerate(dataloader):
+            input_tensor, ground_truth = torch.split(sample_batched['image'].unsqueeze(2), sample_batched['image'].shape[1]//2, dim=1)
+
+            encoder_output, encoder_hidden = encoder(input_tensor)
+            decoder_output = decoder(ground_truth, encoder_hidden, use_teacher_forcing)
+            decoder_output = decoder_output[:,:-1,:,:,:]
+            loss += criterion(decoder_output, ground_truth)
+
+        print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
+              print_loss_avg, print_accuracy_avg), end="\r")
+        writer.add_scalar('testing/loss', loss/(i_batch + 1),
+                          epoch * len(dataloader) + i_batch)
+        writer.add_scalar(
+            'testing/accuracy', accuracy/(i_batch + 1), epoch * len(dataloader) + i_batch)
+        sample = torch.stack([decoder_output[0], ground_truth[0]], dim=0)
+        b,t,c,h,w = sample.shape
+        img_grid = torchvision.utils.make_grid(sample.view([b,c,t*h,w]), nrow=2, normalize=True, scale_each=True)
+        writer.add_image('testing/sample', img_grid, epoch * len(dataloader) + i_batch)
+
+    pass
 
 # -----------------
 # Main Training Loop
@@ -371,17 +403,27 @@ predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5)
 # predictor.eval()
 # out = evaluate(encoder, predictor, torch.randn([1,16,32,32]))
 
-dynaMo_transformed = dynaMODataset(
+
+dynaMo_train_transformed = dynaMODataset(
     root_dir='./datasets/dynaMO/image_files/train/',
     transform=transforms.Compose([
         ToTensor()
     ]))
 
-dynaMO_dataloader = DataLoader(dynaMo_transformed, batch_size=50,
+dynaMo_test_transformed = dynaMODataset(
+    root_dir='./datasets/dynaMO/image_files/test/',
+    transform=transforms.Compose([
+        ToTensor()
+    ]))
+
+dynaMO_trainset = DataLoader(dynaMo_train_transformed, batch_size=50,
                                shuffle=True, num_workers=0, drop_last=True)
 
-trainEpochs(dynaMO_dataloader, encoder, predictor, loss_writer,
-            n_epochs=10, max_length=max_length, print_every=100, plot_every=100)
+dynaMO_testset = DataLoader(dynaMo_test_transformed, batch_size=50,
+                               shuffle=True, num_workers=0, drop_last=True)
+
+trainEpochs(dynaMO_trainset, dynaMO_testset, encoder, predictor, loss_writer,
+            n_epochs=10, max_length=max_length, test_every=1, print_every=100, plot_every=100)
 
 
 torch.save(encoder.state_dict(), './experiments/convlstm_experiment_1/data/config0/models/encoder.model')
