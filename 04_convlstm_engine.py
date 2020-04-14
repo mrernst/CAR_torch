@@ -246,7 +246,7 @@ def train(input_tensor, target_tensor, encoder, decoder, encoder_optimizer,
 
 
 def trainEpochs(dataloader, encoder, decoder, writer, n_epochs, max_length,
-                print_every=1, plot_every=100, save_every=5, learning_rate=0.01,
+                print_every=1, plot_every=100, save_every=5, learning_rate=0.001,
                 experiment_dir='./experiments/protoengine_experiment_1/data/config0/'):
     plot_losses = []
     print_loss_total = 0
