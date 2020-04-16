@@ -65,8 +65,7 @@ import math
 # -----
 
 from datasets.dynaMO.dataset import dynaMODataset, ToTensor
-from utilities.convlstm import ConvLSTMCell, ConvLSTM
-
+from utilities.hopfieldnetwork import HopfieldNet
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -150,6 +149,30 @@ class B_Network(nn.Module):
 
         return x
 
+class BH_Network(nn.Module):
+    def __init__(self):
+        super(B_Network, self).__init__()
+        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
+        self.pool1 = nn.MaxPool2d(2, 2, padding=0)
+        self.bn1 = nn.BatchNorm2d(32)
+        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.pool2 = nn.MaxPool2d(2, 2, padding=0)
+        self.bn2 = nn.BatchNorm2d(32)
+        self.fc1 = nn.Linear(32 * 7 * 7, 10)
+
+    def forward(self, x):
+        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
+        # print(x.shape)
+        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
+        # print(x.shape)
+
+        x = x.view(-1, 32 * 7 * 7)
+        # print(x.shape)
+
+        x = F.softmax(self.fc1(x), 1)
+        # print(x.shape)
+
+        return x
 # -----------------
 # Functions for Training and Evaluation
 # -----------------
