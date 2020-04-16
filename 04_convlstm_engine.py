@@ -103,7 +103,7 @@ def showPlot(points):
 #     else:
 #         plt.imshow(np.transpose(npimg, (1, 2, 0)))
 
-def matplotlib_imshow(img, one_channel=False):
+def matplotlib_imshow(img, one_channel=False, cmap='Greys'):
     fig = plt.figure()
     ax = fig.add_subplot(111)
     if one_channel:
@@ -111,7 +111,7 @@ def matplotlib_imshow(img, one_channel=False):
     img = img / 2 + 0.5
     npimg = img.numpy()
     if one_channel:
-        return (fig, ax, ax.imshow(npimg, cmap='Greys'))
+        return (fig, ax, ax.imshow(npimg, cmap=cmap))
     else:
         return (fig, ax, ax.imshow(np.transpose(npimg, (1,2,0))))
 
@@ -310,43 +310,53 @@ def trainEpochs(train_dataloader, test_dataloader, encoder, decoder, writer, n_e
     writer.close()
 
 
-def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=False, pause=.05):
+def evaluate(encoder, decoder, sample, predict_for=None, use_teacher_forcing=False, indicator=True, pause=.05):
     with torch.no_grad():
+        input_tensor_list = []
+        decoder_tensor_list = []
+        for s in range(sample.shape[0]):
+            #encoder_hidden = encoder.initHidden(input_tensor.size(0))
 
-        #encoder_hidden = encoder.initHidden(input_tensor.size(0))
+            # split data
+            input_tensor, ground_truth = torch.split(sample[s:s+1].unsqueeze(2), sample.shape[1]//2, dim=1)
+            input_tensor_list.append(input_tensor)
 
-        # split data
-        input_tensor, ground_truth = torch.split(sample.unsqueeze(2), sample.shape[1]//2, dim=1)
+            loss = 0
+            accuracy = 0
+            encoder_output, encoder_hidden = encoder(input_tensor)
+
+            b, t, c, h, w = ground_truth.shape
+            if predict_for:
+                ground_truth = torch.zeros([b, predict_for, c, h, w])
+            else:
+                predict_for = t
+            decoder_output = decoder(ground_truth, encoder_hidden, use_teacher_forcing)
+            decoder_tensor_list.append(decoder_output)
+            #decoder_output = decoder_output[:,:-1,:,:,:]
+            #loss += criterion(decoder_output, ground_truth)
 
 
-        loss = 0
-        accuracy = 0
-        encoder_output, encoder_hidden = encoder(input_tensor)
-
-        b, t, c, h, w = ground_truth.shape
-        if predict_for:
-            ground_truth = torch.zeros([b, predict_for, c, h, w])
-        else:
-            predict_for = t
-        decoder_output = decoder(ground_truth, encoder_hidden, use_teacher_forcing)
-        #decoder_output = decoder_output[:,:-1,:,:,:]
-        #loss += criterion(decoder_output, ground_truth)
         plt.ion()
         fig, ax, im = matplotlib_imshow(input_tensor[0,0,0:1,:,:], one_channel=True)
-
-        for step in range(t):
-            img = input_tensor[0,step,0:1,:,:]
-            img = (img.mean(dim=0) / 2 + 0.5).numpy()
-            im.set_array(img)
-            fig.canvas.draw()
-            plt.pause(pause)
-        for step in range(predict_for):
-            img = decoder_output[0,step,0:1,:,:]
-            #img = (img - img.min())/(img.max() - img.min())*255.
-            img = (img.mean(dim=0) / 2 + 0.5).numpy()
-            im.set_array(img)
-            fig.canvas.draw()
-            plt.pause(pause)
+        for input_tensor, decoder_output in zip(input_tensor_list, decoder_tensor_list):
+            for step in range(t):
+                img = input_tensor[0,step,0:1,:,:]
+                img = (img.mean(dim=0) / 2 + 0.5).numpy()
+                im.set_array(img)
+                fig.canvas.draw()
+                plt.pause(pause)
+            if indicator:
+                img = np.ones_like(img)/2
+                im.set_array(img)
+                fig.canvas.draw()
+                plt.pause(pause*10)
+            for step in range(predict_for):
+                img = decoder_output[0,step,0:1,:,:]
+                #img = (img - img.min())/(img.max() - img.min())*255.
+                img = (img.mean(dim=0) / 2 + 0.5).numpy()
+                im.set_array(img)
+                fig.canvas.draw()
+                plt.pause(pause)
 
     return decoder_output
 
@@ -402,7 +412,8 @@ predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5)
 # predictor.load_state_dict(torch.load('./experiments/convlstm_experiment_1/data/config0/models/predictor.model', map_location=torch.device('cpu')))
 # predictor.eval()
 # out = evaluate(encoder, predictor, torch.clamp(torch.randn([1,16,32,32]), -1., 1.), predict_for=100)
-
+# for i in range(2):
+#     out = evaluate(encoder, predictor, sample['image'][i:i+1], predict_for=100)
 
 dynaMo_train_transformed = dynaMODataset(
     root_dir='./datasets/dynaMO/image_files/train/',
