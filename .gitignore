@@ -30,6 +30,7 @@ Network Trash Folder
 Temporary Items
 .apdisk
 
+# Files that are to big to be uploaded to github
 .tfrecord
 .lmdb
 .nova
