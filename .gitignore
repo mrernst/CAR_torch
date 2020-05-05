@@ -37,7 +37,7 @@ Temporary Items
 .gz
 __pycache__
 tfrecord_files
-image_files
+data
 
 # Directories that will be filled by code
 experiments/*
