@@ -378,6 +378,6 @@ if __name__ == "__main__":
     else:
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='train', output_format=args.outputformat,
-            dpath='./{}'.format(args.name))
+            dpath='./data/{}'.format(args.name))
         b.build(target='test', output_format=args.outputformat,
-            dpath='./{}'.format(args.name))
+            dpath='./data/{}'.format(args.name))
