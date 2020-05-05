@@ -48,6 +48,12 @@ parser.add_argument(
      type=str,
      default='bmp',
      help='output format (.bmp, .png, .jpg, lmdb format)')
+parser.add_argument(
+     "-n",
+     "--name",
+     type=str,
+     default='dynamo',
+     help='name of the dataset, export folder')
 parser.add_argument('--classduplicates', dest='classduplicates', action='store_true')
 parser.add_argument('--no-classduplicates', dest='classduplicates', action='store_false')
 parser.set_defaults(classduplicates=True)
@@ -229,7 +235,7 @@ class dynaMOBuilder(object):
         self.class_duplicates = class_duplicates
         self.timesteps = timesteps
 
-    def build(self, target='train', dpath='./', output_format='bmp'):
+    def build(self, target='train', dpath='./dynamo/', output_format='bmp'):
         if target=='train':
             data, labels, _, _  = get()
         else:
@@ -277,7 +283,7 @@ class dynaMOBuilder(object):
                     sample = dynaMOSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = self.dpath + 'image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
+                    filename = self.dpath + '/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
                     if output_format=='lmdb':
@@ -371,5 +377,7 @@ if __name__ == "__main__":
 
     else:
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
-        b.build(target='train', output_format=args.outputformat)
-        b.build(target='test', output_format=args.outputformat)
+        b.build(target='train', output_format=args.outputformat,
+            dpath='./{}'.format(args.name))
+        b.build(target='test', output_format=args.outputformat,
+            dpath='./{}'.format(args.name))
