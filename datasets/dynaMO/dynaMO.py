@@ -135,9 +135,6 @@ class dynaMOSample(object):
     def save_sequence_state_to_image(self, filename, format):
         io.imsave('{}.{}'.format(filename, format), self.sequence_state)
         pass
-    
-    def save_sequence_state_to_file(self, filename, format):
-        pass
 
     def get_zoom(self, z_tar, true_size = .6):
         canvas_size = 1 * 2 * z_tar # tan(45) = 1
@@ -232,14 +229,23 @@ class dynaMOBuilder(object):
         self.class_duplicates = class_duplicates
         self.timesteps = timesteps
 
-    def build(self, target='train', output_format='bmp'):
+    def build(self, target='train', dpath='./', output_format='bmp'):
         if target=='train':
             data, labels, _, _  = get()
         else:
             _, _, data, labels  = get()
 
         self.target = target
-
+        self.dpath = dpath
+        self.lock = threading.Lock()
+        
+        # prepare database file for lmdb output
+        if output_format == 'lmdb':
+            lmdb_path = os.path.join(self.dpath, "lmdb/".format(target))
+            isdir = os.path.isdir(lmdb_path)
+            mkdir_p(lmdb_path)
+            lmdb_path = os.path.join(lmdb_path, "{}.lmdb".format(target))
+            
         def work(data, labels, thread_number):
             print("Task {} assigned to thread: {}".format(thread_number, threading.current_thread().name))
             print("ID of process running task {}: {}".format(thread_number, os.getpid()))
@@ -271,7 +277,7 @@ class dynaMOBuilder(object):
                     sample = dynaMOSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = './image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
+                    filename = self.dpath + 'image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
                     if output_format=='lmdb':
