@@ -95,7 +95,7 @@ parser.add_argument(
      "--config_file",
      type=str,
      default=PWD_STEM +
-             'saturn/experiments/001_noname_experiment/' +
+             'titan/experiments/001_noname_experiment/' +
              'files/config_files/config0.csv',
      help='path to the configuration file of the experiment')
 parser.add_argument(
@@ -115,12 +115,11 @@ FLAGS = parser.parse_args()
 
 
 
-print(FLAGS.testrun)
 
 
-# CONFIG = helper.infer_additional_parameters(
-#     helper.read_config_file(FLAGS.config_file)
-# )
+CONFIG = helper.infer_additional_parameters(
+    helper.read_config_file(FLAGS.config_file)
+)
 
 
 # _____________________________________________________________________________
