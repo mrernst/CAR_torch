@@ -150,28 +150,54 @@ class B_Network(nn.Module):
         return x
 
 class BH_Network(nn.Module):
-    def __init__(self):
-        super(B_Network, self).__init__()
+    def __init__(self, i_factor=1, time_steps=2):
+        super(BH_Network, self).__init__()
+        self.i_factor = i_factor
+        self.time_steps = time_steps
+
         self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
         self.pool1 = nn.MaxPool2d(2, 2, padding=0)
         self.bn1 = nn.BatchNorm2d(32)
+        self.hnet1 = HopfieldNet(32 * 14 * 14)
         self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
         self.bn2 = nn.BatchNorm2d(32)
+        self.hnet2 = HopfieldNet(32 * 7 * 7)
         self.fc1 = nn.Linear(32 * 7 * 7, 10)
 
     def forward(self, x):
-        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        # print(x.shape)
-        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        # print(x.shape)
+        # layer 1
+        x = self.conv1(x)
+        x = self.bn1(x)
+        x = F.relu(x)
+        x = self.pool1(x)
 
+        b, c, h, w = x.shape
+        y = (x > x.mean()).view(b, -1) # reshape here
+        self.act1 = y.detach()
+        for t in range(self.time_steps):
+            y = self.hnet1.step(y)
+        y = y.view(b,c,h,w).type(dtype=torch.float32) * 2 - 1 * self.i_factor # reshape again
+        x += y
+
+        # layer 2
+
+        x = self.conv2(x)
+        x = self.bn2(x)
+        x = F.relu(x)
+        x = self.pool2(x)
+
+        b, c, h, w = x.shape
+        y = (x > x.mean()).view(b, -1)
+        self.act2 = y.detach()
+        for t in range(self.time_steps):
+            y = self.hnet2.step(y)
+        y = y.view(b,c,h,w).type(dtype=torch.float32) * 2 - 1 * self.i_factor # reshape again
+        x += y
+
+        # fc and out
         x = x.view(-1, 32 * 7 * 7)
-        # print(x.shape)
-
         x = F.softmax(self.fc1(x), 1)
-        # print(x.shape)
-
         return x
 # -----------------
 # Functions for Training and Evaluation
@@ -195,6 +221,11 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
 
     loss.backward()
     optimizer.step()
+
+    # update the hopfield networks for B-H
+    network.hnet1.covariance_update(network.act1)
+    network.hnet2.covariance_update(network.act2)
+
     loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
 
@@ -267,7 +298,9 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 
 # Training dataset
 # cnn = Lenet5().to(device)
-cnn = B_Network().to(device)
+#cnn = B_Network().to(device)
+cnn = BH_Network().to(device)
+
 # Training dataset
 train_loader = torch.utils.data.DataLoader(
     datasets.MNIST(root='./', train=True, download=True,
@@ -283,7 +316,7 @@ test_loader = torch.utils.data.DataLoader(
         transforms.Normalize((0.,), (1.,))
     ])), batch_size=100, shuffle=True, num_workers=0)
 
-trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=100,
+trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=1,
             test_every=1)
 
 
