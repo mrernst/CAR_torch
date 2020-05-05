@@ -42,7 +42,12 @@ parser.add_argument(
      type=int,
      default=15,
      help='how many timesteps are visualized')
-
+parser.add_argument(
+     "-oformat",
+     "--outputformat",
+     type=str,
+     default='bmp',
+     help='output format (.bmp, .png, .jpg, lmdb format)')
 parser.add_argument('--classduplicates', dest='classduplicates', action='store_true')
 parser.add_argument('--no-classduplicates', dest='classduplicates', action='store_false')
 parser.set_defaults(classduplicates=True)
@@ -50,6 +55,10 @@ parser.set_defaults(classduplicates=True)
 parser.add_argument('--testrun', dest='testrun', action='store_true')
 parser.add_argument('--no-testrun', dest='testrun', action='store_false')
 parser.set_defaults(testrun=False)
+
+parser.add_argument('--zoom', dest='zoom', action='store_true')
+parser.add_argument('--no-zoom', dest='zoom', action='store_false')
+parser.set_defaults(zoom=True)
 
 parser.add_argument('--interactive', dest='interactive', action='store_true')
 parser.add_argument('--no-interactive', dest='interactive', action='store_false')
@@ -114,14 +123,20 @@ class dynaMOSample(object):
         self.movement = movement
         return movement
 
-    def generate_sequence_state(self, filename):
+    def generate_sequence_state(self):
         seq_state = np.zeros([self.state.shape[0], self.state.shape[1]*(len(self.movement[0])+1)], dtype=np.uint8)
         seq_state[:,:self.state.shape[0]] = self.state
         for i in range(len(self.movement[0])):
             _,_,_ = self.move_camera(self.movement[0][i], self.movement[1][i])
             seq_state[:,(i+1)*self.state.shape[0]:(i+2)*self.state.shape[0]] = self.state
         self.sequence_state = seq_state
-        io.imsave('{}.bmp'.format(filename), self.sequence_state)
+        pass
+    
+    def save_sequence_state_to_image(self, filename, format):
+        io.imsave('{}.{}'.format(filename, format), self.sequence_state)
+        pass
+    
+    def save_sequence_state_to_file(self, filename, format):
         pass
 
     def get_zoom(self, z_tar, true_size = .6):
@@ -136,7 +151,10 @@ class dynaMOSample(object):
     def generate_state(self, targets, xyz_tars):
         canvas = np.zeros([3,128,128], dtype=np.uint8)
         for t in range(targets.shape[0]):
-            tar = scipy.ndimage.zoom(targets[t], self.get_zoom(xyz_tars[t][-1]))
+            if args.zoom:
+                tar = scipy.ndimage.zoom(targets[t], self.get_zoom(xyz_tars[t][-1]))
+            else:
+                tar = targets[t]
             x_position = self.convert_cm_to_px(xyz_tars[t][1],xyz_tars[t][-1], tar.shape[0])
             y_position = self.convert_cm_to_px(xyz_tars[t][0],xyz_tars[t][-1], tar.shape[0])
             try:
@@ -214,7 +232,7 @@ class dynaMOBuilder(object):
         self.class_duplicates = class_duplicates
         self.timesteps = timesteps
 
-    def build(self, target='train'):
+    def build(self, target='train', output_format='bmp'):
         if target=='train':
             data, labels, _, _  = get()
         else:
@@ -228,14 +246,16 @@ class dynaMOBuilder(object):
 
             for i, mnist_image in enumerate(data):
                 if not self.class_duplicates:
+                    ks = []
                     cands_of_same_class = np.where(labels==labels[i])
                     choiceset = set(range(data.shape[0])).difference(set(cands_of_same_class[0]))
                     js = np.random.choice(np.array(list(choiceset)), self.n_proliferation)
 
                     for j in js:
                         cands_of_same_class = np.where(labels==labels[j])
-                        choiceset = choiceset.difference(set(cands_of_same_class[0]))
-                    ks = np.random.choice(np.array(list(choiceset)), self.n_proliferation)
+                        subchoiceset = choiceset.difference(set(cands_of_same_class[0]))
+                        ks.append(np.random.choice(np.array(list(subchoiceset))))
+                    ks = np.array(ks)
                 else:
                     js = np.random.choice(data.shape[0], self.n_proliferation)
                     ks = np.random.choice(data.shape[0], self.n_proliferation)
@@ -253,7 +273,11 @@ class dynaMOBuilder(object):
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
                     filename = './image_files/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
-                    sample.generate_sequence_state(filename)
+                    sample.generate_sequence_state()
+                    if output_format=='lmdb':
+                        pass
+                    else:
+                        sample.save_sequence_state_to_image(filename, output_format)
                     #print(" " * 80 + "\r" +
                     #    '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
                     if (p+1 + i*self.n_proliferation)%100 == 0:
@@ -341,5 +365,5 @@ if __name__ == "__main__":
 
     else:
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
-        b.build(target='train')
-        b.build(target='test')
+        b.build(target='train', output_format=args.outputformat)
+        b.build(target='test', output_format=args.outputformat)
