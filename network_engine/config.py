@@ -60,8 +60,6 @@ PWD_STEM = "/Users/markus/Research/Code/" if IS_MACOSX else "/home/mernst/git/"
 # main experiment parameters
 # --------------------------
 
-# TODO: Adapt a simpler parameter scope?
-
 def get_par():
     """
     Get main parameters.
@@ -71,7 +69,7 @@ def get_par():
 
     par = {}
 
-    par['exp_name'] = ["fmnist_testrun"]
+    par['exp_name'] = ["osmnist_testrun"]
     # par['name'] must be defined as a FLAG to engine, b/c it resembles the
     # iteration number that gets passed by the sbatch script
     # TODO: add documentation i.e. parameter possibilities

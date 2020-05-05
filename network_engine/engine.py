@@ -68,7 +68,7 @@ import utilities.helper as helper
 # network structure
 from utilities.networks.convlstm import ConvLSTMCell, ConvLSTM
 # dataset
-from utilities.data_handler import dynaMODataset, ToTensor
+from utilities.dataset_handler import dynaMODataset, ToTensor
 
 
 # cross-platform development
