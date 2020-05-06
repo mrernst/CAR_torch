@@ -66,7 +66,7 @@ import math
 
 import utilities.helper as helper
 # network structure
-from utilities.networks.convlstm import ConvLSTMCell, ConvLSTM
+from utilities.networks.buildingblocks.convlstm import ConvLSTMCell, ConvLSTM
 # dataset
 from utilities.dataset_handler import dynaMODataset, ToTensor
 

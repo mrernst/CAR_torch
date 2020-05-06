@@ -173,10 +173,10 @@ def infer_additional_parameters(configuration_dict):
         configuration_dict['image_channels'] *= 2
     
     # use sigmoid for n-hot task, otherwise softmax
-    if configuration_dict['label_type'] == 'nhot':
-        configuration_dict['crossentropy_fn'] = sigmoid_cross_entropy
-    else:
-        configuration_dict['crossentropy_fn'] = softmax_cross_entropy
+    # if configuration_dict['label_type'] == 'nhot':
+    #     configuration_dict['crossentropy_fn'] = sigmoid_cross_entropy
+    # else:
+    #     configuration_dict['crossentropy_fn'] = softmax_cross_entropy
     
     # to crop the images
     # store the original values
@@ -305,123 +305,6 @@ def get_output_directory(configuration_dict, flags):
 
     return writer_directory, checkpoint_directory
 
-
-def get_input_directory(configuration_dict):
-    """
-    get_input_directory takes a dict configuration_dict and returns a path to
-    the image_data and a parser for the tf_records files.
-    """
-    # TODO: Integrate CIFAR and FashionMNIST
-    if configuration_dict['dataset'] == "osycb":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'osycb/tfrecord_files/{}occ/{}p/{}/'.format(
-                configuration_dict['n_occluders'],
-                configuration_dict['occlusion_percentage'],
-                configuration_dict['downsampling'])
-        parser = tfrecord_handler._osycb_parse_single
-    elif configuration_dict['dataset'] == "osmnist":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'osmnist/tfrecord_files/{}occ/'.format(
-                configuration_dict['n_occluders'])
-        parser = tfrecord_handler._osmnist_parse_single
-    elif configuration_dict['dataset'] == "osfashionmnist":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'osmnist/osfashionmnist/tfrecord_files/{}occ/'.format(
-                configuration_dict['n_occluders'])
-        parser = tfrecord_handler._osmnist_parse_single
-    elif configuration_dict['dataset'] == "oskuzushijimnist":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'osmnist/oskuzushijimnist/tfrecord_files/{}occ/'.format(
-                configuration_dict['n_occluders'])
-        parser = tfrecord_handler._osmnist_parse_single
-    elif configuration_dict['dataset'] == "osmnistwithcues":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'osmnistwithcues/tfrecord_files/{}occ/'.format(
-                configuration_dict['n_occluders'])
-        # TODO: A new folder structure like the following?
-        # 'osmnist/tfrecord_files/fashion/cues/{}occ/'
-        # 'osmnist/tfrecord_files/digits/random/{}occ/'
-        parser = tfrecord_handler._osmnist_parse_single
-    elif configuration_dict['dataset'] == "mnist":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'mnist/tfrecord_files/'
-        parser = tfrecord_handler._mnist_parse_single
-    elif configuration_dict['dataset'] == "fashionmnist":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'mnist/fashionmnist/tfrecord_files/'
-        parser = tfrecord_handler._mnist_parse_single
-    elif configuration_dict['dataset'] == "kuzushijimnist":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'mnist/kuzushijimnist/tfrecord_files/'
-        parser = tfrecord_handler._mnist_parse_single
-    elif configuration_dict['dataset'] == "cifar10":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'cifar10/tfrecord_files/'
-        parser = tfrecord_handler._cifar10_parse_single
-    elif configuration_dict['dataset'] == "osdigit":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'digit_database/tfrecord_files/{}{}/'.format(
-                configuration_dict['n_occluders'] - 1,
-                configuration_dict['dataset'])
-        parser = tfrecord_handler._osdigits_parse_single
-    elif configuration_dict['dataset'] == "digit":
-        tfrecord_dir = configuration_dict['input_dir'] + \
-            'digit_database/tfrecord_files/{}{}/'.format(
-                configuration_dict['n_occluders'] - 1,
-                configuration_dict['dataset'])
-        parser = tfrecord_handler._digits_parse_single
-    # deprecated datasets
-    elif configuration_dict['dataset'] == "ycb1_single":
-        parser = tfrecord_handler._ycb1_parse_single
-        tfrecord_dir = ''
-        print("[INFO] Dataset is deprecated, paths must be defined manually.")
-    elif configuration_dict['dataset'] == "ycb1_sequence":
-        parser = tfrecord_handler._ycb1_parse_sequence
-        tfrecord_dir = ''
-        print("[INFO] Dataset is deprecated, paths must be defined manually.")
-    else:
-        print("[INFO] Dataset not defined")
-        sys.exit()
-
-    return tfrecord_dir, parser
-
-
-def get_image_files(tfrecord_dir, training_dir, validation_dir, test_dir,
-                    evaluation_dir, input_directory, dataset, n_occluders,
-                    downsampling):
-    """
-    get_image_files takes paths to tfrecord_dir, training_dir, validation_dir
-    test_dir and evaluation_dir and returns the corresponding file names.
-    """
-    list_of_dirs = [training_dir, validation_dir, test_dir, evaluation_dir]
-    list_of_types = ['train', 'validation', 'test', 'evaluation']
-    list_of_files = []
-    for i in range(len(list_of_dirs)):
-        type = list_of_types[i]
-        if list_of_dirs[i]:
-            if list_of_dirs[i] == 'all':
-                list_of_files.append(
-                    tfrecord_handler.all_percentages_tfrecord_paths(
-                        type=type, dataset=dataset, n_occluders=n_occluders,
-                        downsampling=downsampling,
-                        input_directory=input_directory))
-            else:
-                list_of_files.append(
-                    tfrecord_handler.tfrecord_auto_traversal(list_of_dirs[i]))
-        else:
-            try:
-                list_of_files.append(tfrecord_handler.tfrecord_auto_traversal(
-                    tfrecord_dir + list_of_types[i] + '/'))
-            except(FileNotFoundError):
-                list_of_files.append('')
-    training, validation, testing, evaluation = list_of_files
-    if len(testing) == 0:
-        print('[INFO] No test-set found, using validation-set instead')
-        testing += validation
-    elif len(validation) == 0:
-        validation += testing
-        print('[INFO] No validation-set found, using test-set instead')
-    return training, validation, testing, evaluation
 
 
 def compile_list_of_train_summaries():

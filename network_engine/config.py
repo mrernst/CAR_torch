@@ -122,7 +122,7 @@ def get_aux():
     # aux['input_dir'] = ["/home/aecgroup/aecdata/Textures/occluded/datasets/"]
     aux['output_dir'] = ["{}titan/experiments/".format(PWD_STEM)]
     # aux['output_dir'] = ["/home/aecgroup/aecdata/Results_python/markus/experiments/"]
-    aux['network_module'] = ["utilities.networks.simplercnn"]
+    aux['network_module'] = ["utilities.networks.clstm_net"]
     aux['norm_by_stat'] = [False]
     aux['training_dir'] = [""] # "all"
     aux['validation_dir'] = [""] # ""
