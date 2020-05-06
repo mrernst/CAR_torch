@@ -64,8 +64,9 @@ import math
 # custom functions
 # -----
 
-from utilities.dataset_handler import dynaMODataset, ToTensor
 from utilities.networks.buildingblocks.hopfield import HopfieldNet
+from utilities.dataset_handler import ImageFolderLMDB
+
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -296,28 +297,65 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 # Main Training Loop
 # -----------------
 
-# Training dataset
+# Training network
 # cnn = Lenet5().to(device)
 #cnn = B_Network().to(device)
 cnn = BH_Network().to(device)
 
-# Training dataset
-train_loader = torch.utils.data.DataLoader(
-    datasets.MNIST(root='./', train=True, download=True,
+# torchvision.datasets.ImageFolder(root, transform=None, target_transform=None, loader=<function default_loader>, is_valid_file=None)
+
+train_dataset = datasets.MNIST(root='../datasets/', train=True, download=True,
                    transform=transforms.Compose([
                        transforms.ToTensor(),
                        transforms.Normalize((0.,), (1.,))
-                   ])), batch_size=100, shuffle=True, num_workers=0)
+                   ]))
 
-# Test dataset
-test_loader = torch.utils.data.DataLoader(
-    datasets.MNIST(root='./', train=False, transform=transforms.Compose([
-        transforms.ToTensor(),
-        transforms.Normalize((0.,), (1.,))
-    ])), batch_size=100, shuffle=True, num_workers=0)
+test_dataset = datasets.MNIST(root='../datasets/', train=False, transform=transforms.Compose([
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
 
-trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=1,
-            test_every=1)
+
+# train_dataset = datasets.ImageFolder(
+#     root='../datasets/dynaMO/data/mnist/train/',
+#     transform=transforms.Compose([
+#     transforms.Grayscale(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
+# 
+# test_dataset = datasets.ImageFolder(
+#     root='../datasets/dynaMO/data/mnist/test/',
+#     transform=transforms.Compose([
+#     transforms.Grayscale(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
+
+
+# train_dataset = ImageFolderLMDB(
+#     db_path='../datasets/dynaMO/data/mnist/train.lmdb',
+#     transform=transforms.Compose([
+#     transforms.Grayscale(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
+# 
+# test_dataset = ImageFolderLMDB(
+#     db_path='../datasets/dynaMO/data/mnist/test.lmdb',
+#     transform=transforms.Compose([
+#     transforms.Grayscale(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
+
+
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=100, shuffle=True, num_workers=0)
+
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=100, shuffle=True, num_workers=0)
+
+
+trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=1, test_every=1)
 
 
 # _____________________________________________________________________________

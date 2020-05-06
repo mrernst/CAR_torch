@@ -193,10 +193,10 @@ class ImageFolderLMDB(Dataset):
 
 		if self.target_transform is not None:
 			target = self.target_transform(target)
-
-		sample = {'image': img, 'target': target}
-		# return img, target
-		return sample
+		return img, target
+		
+		#sample = {'image': img, 'target': target}
+		#return sample
 
 
 	def __len__(self):
