@@ -50,7 +50,7 @@ import torch
 # network class
 # -----
 
-class HopfieldNet:
+class HopfieldNet(object):
     """
     A Hopfield network.
     """
@@ -226,6 +226,13 @@ class HopfieldNet:
         # return seems odd here
         return new_weights, rate
 
+
+# TODO implement Continuous Version and Local Weights
+class ContinuousHopfieldNet(HopfieldNet):
+    pass
+
+class LocalHopfieldNet(HopfieldNet):
+    pass
 
 # _____________________________________________________________________________
 
