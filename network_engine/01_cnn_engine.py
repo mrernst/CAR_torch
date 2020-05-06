@@ -44,26 +44,28 @@
 
 # standard libraries
 # -----
-from __future__ import division
-import os
 import numpy as np
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 import torch
-from torchvision import transforms, utils, datasets
-from torch.utils.data import Dataset, DataLoader
 import torch.nn as nn
-from torch import optim
 import torch.nn.functional as F
-import random
+from torch import optim
 
+from torchvision import transforms, utils
+from torch.utils.data import Dataset, DataLoader
+from torch.utils.tensorboard import SummaryWriter
+import torchvision
+import torchvision.transforms as transforms
+
+import argparse
+import os
+import random
 import time
 import math
 
 
 # custom functions
 # -----
-
+import utilities.helper as helper
 from utilities.networks.buildingblocks.hopfield import HopfieldNet
 from utilities.dataset_handler import ImageFolderLMDB
 
@@ -88,6 +90,56 @@ def showPlot(points):
     loc = ticker.MultipleLocator(base=0.2)
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
+
+
+
+# cross-platform development
+
+from platform import system
+IS_MACOSX = True if system() == 'Darwin' else False
+PWD_STEM = "/Users/markus/Research/Code/" if IS_MACOSX else "/home/mernst/git/"
+
+# commandline arguments
+# -----
+
+# FLAGS
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+     "-t",
+     "--testrun",
+     # type=bool,
+     default=False,
+     dest='testrun',
+     action='store_true',
+     help='reduced dataset configuration on local machine for testing')
+parser.add_argument(
+     "-c",
+     "--config_file",
+     type=str,
+     default=PWD_STEM +
+             'titan/experiments/001_noname_experiment/' +
+             'files/config_files/config0.csv',
+     help='path to the configuration file of the experiment')
+parser.add_argument(
+     "-n",
+     "--name",
+     type=str,
+     default='',
+     help='name of the run, i.e. iteration1')
+parser.add_argument(
+     "-r",
+     "--restore_ckpt",
+     type=bool,
+     default=True,
+     help='restore model from last checkpoint')
+
+FLAGS = parser.parse_args()
+
+
+CONFIG = helper.infer_additional_parameters(
+    helper.read_config_file(FLAGS.config_file)
+)
 
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
@@ -134,7 +186,7 @@ class B_Network(nn.Module):
         self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
         self.bn2 = nn.BatchNorm2d(32)
-        self.fc1 = nn.Linear(32 * 7 * 7, 10)
+        self.fc1 = nn.Linear(32 * 8 * 8, 10) # 32 * 7 * 7 for MNIST
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
@@ -142,7 +194,7 @@ class B_Network(nn.Module):
         x = self.pool2(F.relu(self.bn2(self.conv2(x))))
         # print(x.shape)
 
-        x = x.view(-1, 32 * 7 * 7)
+        x = x.view(-1, 32 * 8 * 8) # 32 * 7 * 7 for MNIST
         # print(x.shape)
 
         x = F.softmax(self.fc1(x), 1)
@@ -159,12 +211,12 @@ class BH_Network(nn.Module):
         self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
         self.pool1 = nn.MaxPool2d(2, 2, padding=0)
         self.bn1 = nn.BatchNorm2d(32)
-        self.hnet1 = HopfieldNet(32 * 14 * 14)
+        self.hnet1 = HopfieldNet(32 * 16 * 16) # 32 * 14 * 14 for MNIST
         self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
         self.bn2 = nn.BatchNorm2d(32)
-        self.hnet2 = HopfieldNet(32 * 7 * 7)
-        self.fc1 = nn.Linear(32 * 7 * 7, 10)
+        self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
+        self.fc1 = nn.Linear(32 * 8 * 8, 10)
 
     def forward(self, x):
         # layer 1
@@ -197,7 +249,7 @@ class BH_Network(nn.Module):
         x += y
 
         # fc and out
-        x = x.view(-1, 32 * 7 * 7)
+        x = x.view(-1, 32 * 8 * 8)
         x = F.softmax(self.fc1(x), 1)
         return x
 # -----------------
@@ -224,8 +276,8 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.step()
 
     # update the hopfield networks for B-H
-    network.hnet1.covariance_update(network.act1)
-    network.hnet2.covariance_update(network.act2)
+    #network.hnet1.covariance_update(network.act1)
+    #network.hnet2.covariance_update(network.act2)
 
     loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
@@ -299,8 +351,8 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 
 # Training network
 # cnn = Lenet5().to(device)
-#cnn = B_Network().to(device)
-cnn = BH_Network().to(device)
+cnn = B_Network().to(device)
+# cnn = BH_Network().to(device)
 
 # train_dataset = datasets.MNIST(root='../datasets/', train=True, download=True,
 #                    transform=transforms.Compose([
