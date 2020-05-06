@@ -244,13 +244,6 @@ class dynaMOBuilder(object):
         self.target = target
         self.dpath = dpath
         self.lock = threading.Lock()
-        
-        # prepare database file for lmdb output
-        if output_format == 'lmdb':
-            lmdb_path = os.path.join(self.dpath, "lmdb/".format(target))
-            isdir = os.path.isdir(lmdb_path)
-            mkdir_p(lmdb_path)
-            lmdb_path = os.path.join(lmdb_path, "{}.lmdb".format(target))
             
         def work(data, labels, thread_number):
             print("Task {} assigned to thread: {}".format(thread_number, threading.current_thread().name))
@@ -286,10 +279,7 @@ class dynaMOBuilder(object):
                     filename = self.dpath + '/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
-                    if output_format=='lmdb':
-                        pass
-                    else:
-                        sample.save_sequence_state_to_image(filename, output_format)
+                    sample.save_sequence_state_to_image(filename, output_format)
                     #print(" " * 80 + "\r" +
                     #    '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
                     if (p+1 + i*self.n_proliferation)%100 == 0:
@@ -311,6 +301,44 @@ class dynaMOBuilder(object):
             threadlist[t].start()
         for t in range(self.n_threads):
             threadlist[t].join()
+    
+    def build_mnist_only(self, target='train', dpath='./mnist/', output_format='bmp'):
+        if target=='train':
+            data, labels, _, _  = get()
+        else:
+            _, _, data, labels  = get()
+
+        self.target = target
+        self.dpath = dpath
+            
+        def work(data, labels, thread_number):
+            print("Task {} assigned to thread: {}".format(thread_number, threading.current_thread().name))
+            print("ID of process running task {}: {}".format(thread_number, os.getpid()))
+
+            for i, mnist_image in enumerate(data):
+                filename = self.dpath + '/{}/{}/t{}i{}_{}'.format(self.target, labels[i], thread_number, i, labels[i])
+                mkdir_p(filename.rsplit('/', 1)[0])
+                io.imsave('{}.{}'.format(filename, output_format), mnist_image.reshape([28,28]))
+                if (i)%100 == 0:
+                    print("[THREAD {}]: ({} / {}) images done".format(threading.current_thread().name, i, data.shape[0]))
+            return None
+            
+        if args.testrun:
+            data=data[:30]
+            labels = labels[:30]
+        # split the data
+        datasize_per_thread = data.shape[0]//self.n_threads
+        # establish threads
+        threadlist = []
+        for t in range(self.n_threads - 1):
+            threadlist.append(threading.Thread(target=work, args=(data[t*datasize_per_thread:(t+1)*datasize_per_thread], labels[t*datasize_per_thread:(t+1)*datasize_per_thread], t), name='t{}'.format(t)))
+        threadlist.append(threading.Thread(target=work, args=(data[(self.n_threads - 1)*datasize_per_thread:], labels[(self.n_threads - 1)*datasize_per_thread:], (self.n_threads - 1)), name='t{}'.format((self.n_threads - 1))))
+
+        for t in range(self.n_threads):
+            threadlist[t].start()
+        for t in range(self.n_threads):
+            threadlist[t].join()
+
 
 
 def create_sample_animations(N=10):
