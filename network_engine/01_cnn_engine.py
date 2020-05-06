@@ -309,7 +309,7 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
     criterion = nn.CrossEntropyLoss()
-
+    
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
             test_loss, test_accurary = test(test_loader, network, criterion,
