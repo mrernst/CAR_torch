@@ -91,6 +91,26 @@ def showPlot(points):
     ax.yaxis.set_major_locator(loc)
     plt.plot(points)
 
+def matplotlib_imshow(img, one_channel=False, cmap='Greys'):
+    fig = plt.figure()
+    ax = fig.add_subplot(111)
+    if one_channel:
+        img = img.mean(dim=0)
+    img = img / 2 + 0.5
+    npimg = img.numpy()
+    if one_channel:
+        return (fig, ax, ax.imshow(npimg, cmap=cmap))
+    else:
+        return (fig, ax, ax.imshow(np.transpose(npimg, (1,2,0))))
+
+
+def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
+    model_out_path = experiment_dir + "model_epoch_{}.pth".format(epoch)
+    torch.save(model, model_out_path)
+    print("[Info:] Checkpoint saved to {}".format(model_out_path, end='\n'))
+    if (epoch > 0 and remove_last):
+        os.remove(experiment_dir +
+                  "model_epoch_{}.pth".format(epoch - save_every))
 
 
 # cross-platform development
