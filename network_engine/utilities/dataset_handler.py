@@ -40,12 +40,29 @@
 
 # standard libraries
 # -----
-import os
-import torch
-from skimage import io, transform
+
 import numpy as np
+
+import os
+import sys
+import six
+import string
+
+import lmdb
+import pickle
+import msgpack
+import tqdm
+import pyarrow as pa
+
+import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision import transforms, utils
+from torchvision.transforms import transforms
+from torchvision.datasets import ImageFolder
+from torchvision import transforms, datasets
+
+from skimage import io, transform
+from PIL import Image
+
 
 # custom functions
 # -----
@@ -61,7 +78,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 class dynaMODataset(Dataset):
 	"""Dynamic Occluded MNIST Dataset"""
 
-	def __init__(self, root_dir, transform=None):
+	def __init__(self, root_dir, transform=None, target_transform=None):
 		"""
 		Args:
 			root_dir (string): Directory with all the images.
@@ -70,6 +87,7 @@ class dynaMODataset(Dataset):
 		"""
 		self.root_dir = root_dir
 		self.transform = transform
+		self.target_transform = target_transform
 		self.paths_to_samples = []
 		self.height = 32
 		self.width = 32
@@ -107,31 +125,155 @@ class dynaMODataset(Dataset):
 		for t in self.paths_to_samples[idx].rsplit('_', 1)[-1].rsplit('.')[0]:
 			target.append(int(t))
 		target = np.array(target, dtype=np.uint8)
-		sample = {'image': image_array, 'target': target}
+		
+		if self.transform is not None:
+			image_array = self.transform(image_array)
 
-		if self.transform:
-			sample = self.transform(sample)
+		if self.target_transform is not None:
+			target = self.target_transform(target)
+
+		sample = {'image': image_array, 'target': target}
 
 		return sample
 
 
-class ToTensor(object):
+class ToSingle(object):
 	"""Convert ndarrays in sample to Tensors."""
 
-	def __call__(self, sample):
-		image, target = sample['image'], sample['target']
+	def __call__(self, target_sequence):
+		return torch.tensor(target_sequence[-1], dtype=torch.int64, device=device)
 
-		# swap color axis because
-		# numpy image: H x W x C
-		# torch image: C X H X W
-		image = image.transpose((2, 0, 1)) / (255./2) - 1 # crude normalization
-		# return {'image': torch.from_numpy(image).type(torch.float32),
-		#         'target': torch.from_numpy(target).type(torch.int64),
-		#         'single': torch.from_numpy(target[-1:]).type(torch.int64)} #transforms.functional.normalize(tensor, 0, 1, inplace=False)
-		return {'image': torch.tensor(image, dtype=torch.float32, device=device),
-				'target': torch.tensor(target, dtype=torch.int64, device=device),
-				'single': torch.tensor(target[-1], dtype=torch.int64, device=device)}
 
+class ToTimeSeries(object):
+	"""Convert given data in sample to timeseries."""
+	def __init__(self, height=32, width=32):
+		self.height = height
+		self.width = width
+	def __call__(self, image_array):
+		image_array = image_array.reshape(self.height, self.width, -1, order='F')
+		return image_array
+
+
+
+
+class ImageFolderLMDB(Dataset):
+	def __init__(self, db_path, transform=None, target_transform=None):
+		self.db_path = db_path
+		self.env = lmdb.open(db_path, subdir=os.path.isdir(db_path),
+							 readonly=True, lock=False,
+							 readahead=False, meminit=False)
+		with self.env.begin(write=False) as txn:
+			# self.length = txn.stat()['entries'] - 1
+			self.length =pa.deserialize(txn.get(b'__len__'))
+			self.keys= pa.deserialize(txn.get(b'__keys__'))
+
+		self.transform = transform
+		self.target_transform = target_transform
+
+	def __getitem__(self, index):
+		img, target = None, None
+		env = self.env
+		with env.begin(write=False) as txn:
+			byteflow = txn.get(self.keys[index])
+		unpacked = pa.deserialize(byteflow)
+
+		# load image
+		imgbuf = unpacked[0]
+		buf = six.BytesIO()
+		buf.write(imgbuf)
+		buf.seek(0)
+		img = Image.open(buf).convert('RGB')
+
+		# load label
+		target = unpacked[1]
+
+		if self.transform is not None:
+			img = self.transform(img)
+
+		if self.target_transform is not None:
+			target = self.target_transform(target)
+
+		sample = {'image': img, 'target': target}
+		# return img, target
+		return sample
+
+
+	def __len__(self):
+		return self.length
+
+	def __repr__(self):
+		return self.__class__.__name__ + ' (' + self.db_path + ')'
+
+
+
+def raw_reader(path):
+	with open(path, 'rb') as f:
+		bin_data = f.read()
+	return bin_data
+
+
+def dumps_pyarrow(obj):
+	"""
+	Serialize an object.
+
+	Returns:
+		Implementation-dependent bytes-like object
+	"""
+	return pa.serialize(obj).to_buffer()
+
+
+def folder2lmdb(dpath, name="train", write_frequency=5000, num_workers=16):
+	directory = os.path.expanduser(os.path.join(dpath, name))
+	print("Loading dataset from %s" % directory)
+	dataset = ImageFolder(directory, loader=raw_reader)
+	data_loader = DataLoader(dataset, num_workers=num_workers, collate_fn=lambda x: x)
+
+	lmdb_path = os.path.join(dpath, "%s.lmdb" % name)
+	isdir = os.path.isdir(lmdb_path)
+
+	print("Generate LMDB to %s" % lmdb_path)
+	db = lmdb.open(lmdb_path, subdir=isdir,
+				   map_size=1099511627776,
+				   readonly=False,
+				   meminit=False, map_async=True)
+	
+	print(len(dataset), len(data_loader))
+	txn = db.begin(write=True)
+	for idx, data in enumerate(data_loader):
+		# print(type(data), data)
+		image, label = data[0]
+		txn.put(u'{}'.format(idx).encode('ascii'), dumps_pyarrow((image, label)))
+		if idx % write_frequency == 0:
+			print("[%d/%d]" % (idx, len(data_loader)))
+			txn.commit()
+			txn = db.begin(write=True)
+
+	# finish iterating through dataset
+	txn.commit()
+	keys = [u'{}'.format(k).encode('ascii') for k in range(idx + 1)]
+	with db.begin(write=True) as txn:
+		txn.put(b'__keys__', dumps_pyarrow(keys))
+		txn.put(b'__len__', dumps_pyarrow(len(keys)))
+
+	print("Flushing database ...")
+	db.sync()
+	db.close()
+
+
+
+if __name__ == "__main__":
+	import argparse
+	parser = argparse.ArgumentParser()
+	parser.add_argument("-f", "--folder", type=str)
+	parser.add_argument('-s', '--split', type=str, default="val")
+	parser.add_argument('--out', type=str, default=".")
+	parser.add_argument('-p', '--procs', type=int, default=20)
+
+	args = parser.parse_args()
+
+	folder2lmdb(args.folder, num_workers=args.procs, name=args.split)
+
+	
 # _____________________________________________________________________________
 
 

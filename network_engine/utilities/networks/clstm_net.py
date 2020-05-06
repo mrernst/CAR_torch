@@ -53,7 +53,7 @@ import torch.nn.functional as F
 # custom functions
 # -----
 from utilities.networks.buildingblocks.convlstm import ConvLSTMCell, ConvLSTM
-from utilities.dataset_handler import dynaMODataset, ToTensor
+from utilities.dataset_handler import dynaMODataset, ToTimeSeries, ToSingle
 
 
 # _____________________________________________________________________________
