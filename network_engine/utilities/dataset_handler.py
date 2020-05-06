@@ -222,6 +222,7 @@ def dumps_pyarrow(obj):
 	"""
 	return pa.serialize(obj).to_buffer()
 
+# TODO: Support for multiple labels -> nhot
 
 def folder2lmdb(dpath, name="train", write_frequency=5000, num_workers=16):
 	directory = os.path.expanduser(os.path.join(dpath, name))

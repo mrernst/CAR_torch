@@ -302,18 +302,16 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 #cnn = B_Network().to(device)
 cnn = BH_Network().to(device)
 
-# torchvision.datasets.ImageFolder(root, transform=None, target_transform=None, loader=<function default_loader>, is_valid_file=None)
-
-train_dataset = datasets.MNIST(root='../datasets/', train=True, download=True,
-                   transform=transforms.Compose([
-                       transforms.ToTensor(),
-                       transforms.Normalize((0.,), (1.,))
-                   ]))
-
-test_dataset = datasets.MNIST(root='../datasets/', train=False, transform=transforms.Compose([
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
+# train_dataset = datasets.MNIST(root='../datasets/', train=True, download=True,
+#                    transform=transforms.Compose([
+#                        transforms.ToTensor(),
+#                        transforms.Normalize((0.,), (1.,))
+#                    ]))
+# 
+# test_dataset = datasets.MNIST(root='../datasets/', train=False, transform=transforms.Compose([
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
 
 
 # train_dataset = datasets.ImageFolder(
@@ -333,21 +331,21 @@ test_dataset = datasets.MNIST(root='../datasets/', train=False, transform=transf
 # ]))
 
 
-# train_dataset = ImageFolderLMDB(
-#     db_path='../datasets/dynaMO/data/mnist/train.lmdb',
-#     transform=transforms.Compose([
-#     transforms.Grayscale(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
-# 
-# test_dataset = ImageFolderLMDB(
-#     db_path='../datasets/dynaMO/data/mnist/test.lmdb',
-#     transform=transforms.Compose([
-#     transforms.Grayscale(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
+train_dataset = ImageFolderLMDB(
+    db_path='../datasets/dynaMO/data/osmnist2/train.lmdb',
+    transform=transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
+
+test_dataset = ImageFolderLMDB(
+    db_path='../datasets/dynaMO/data/osmnist2/test.lmdb',
+    transform=transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
 
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=100, shuffle=True, num_workers=0)
