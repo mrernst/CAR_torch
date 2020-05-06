@@ -164,6 +164,7 @@ CONFIG = helper.infer_additional_parameters(
 
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
+
 # -----------------
 # Encoder and Decoder Classes of the network
 # -----------------
@@ -305,6 +306,7 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
 
 def test(test_loader, network, criterion, epoch):
     loss = 0
+    accuracy = 0
     with torch.no_grad():
         for i, data in enumerate(test_loader):
             input_tensor, target_tensor = data
@@ -312,29 +314,37 @@ def test(test_loader, network, criterion, epoch):
             loss += criterion(network_output, target_tensor) / \
                 test_loader.batch_size
             topv, topi = network_output.topk(1)
-            accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
-                                                           loss / i, accuracy), end="\n")
-    return loss, accuracy
+                                                           loss /(i+1), accuracy/(i+1)), end="\n")
+    
+    
+    return loss /(i+1), accuracy/(i+1)
 
 
-def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, test_every=1, plot_every=100, learning_rate=0.001):
+def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
     plot_losses = []
     print_loss_total = 0
     print_accuracy_total = 0
     plot_loss_total = 0
+    plot_accuracy_total = 0
+    
     len_of_data = len(train_loader)
 
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
+    
     criterion = nn.CrossEntropyLoss()
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
             test_loss, test_accurary = test(test_loader, network, criterion,
                                             epoch)
-
+            writer.add_scalar('testing/loss', test_loss,
+                              epoch * len_of_data)
+            writer.add_scalar(
+                'testing/accuracy', test_accurary, epoch * len_of_data)
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
@@ -344,6 +354,7 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
             print_loss_total += loss
             plot_loss_total += loss
             print_accuracy_total += accuracy
+            plot_accuracy_total += accuracy
 
             if i_batch % print_every == 0:
                 print_loss_avg = print_loss_total / print_every
@@ -358,8 +369,22 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 
             if i_batch % plot_every == 0:
                 plot_loss_avg = plot_loss_total / plot_every
+                plot_accuracy_avg = plot_accuracy_total / plot_every
+
                 plot_losses.append(plot_loss_avg)
+                
+                writer.add_scalar(
+                    'training/loss', plot_loss_avg,
+                      epoch * len_of_data + i_batch)
+                writer.add_scalar(
+                    'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
+            
                 plot_loss_total = 0
+                plot_accuracy_total = 0
+                
+        if epoch % save_every == 0:
+                checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
+
 
     showPlot(plot_losses)
     plt.show()
@@ -371,8 +396,48 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 
 # Training network
 # cnn = Lenet5().to(device)
-cnn = B_Network().to(device)
+network = B_Network().to(device)
 # cnn = BH_Network().to(device)
+
+
+# Datasets
+train_dataset = ImageFolderLMDB(
+    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
+    transform=transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
+
+test_dataset = ImageFolderLMDB(
+    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/test.lmdb',
+    transform=transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
+
+
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=0)
+
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=0)
+
+
+# Tensorboard Writer
+
+output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
+loss_writer = SummaryWriter(output_dir)
+
+
+trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
+            test_every=1, print_every=1, plot_every=1, save_every=5, learning_rate=0.001, output_dir=output_dir, checkpoint_dir=checkpoint_dir)
+
+# TODO: CONFIG['learning_rate']
+
+torch.save(network.state_dict(), checkpoint_dir + 'network.model')
+# TODO: Implement general checkpointing in trainEpochs
+
+# _____________________________________________________________________________
 
 # train_dataset = datasets.MNIST(root='../datasets/', train=True, download=True,
 #                    transform=transforms.Compose([
@@ -401,32 +466,6 @@ cnn = B_Network().to(device)
 #     transforms.ToTensor(),
 #     transforms.Normalize((0.,), (1.,))
 # ]))
-
-
-train_dataset = ImageFolderLMDB(
-    db_path='../datasets/dynaMO/data/osmnist2/train.lmdb',
-    transform=transforms.Compose([
-    transforms.Grayscale(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
-
-test_dataset = ImageFolderLMDB(
-    db_path='../datasets/dynaMO/data/osmnist2/test.lmdb',
-    transform=transforms.Compose([
-    transforms.Grayscale(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
-
-
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=100, shuffle=True, num_workers=0)
-
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=100, shuffle=True, num_workers=0)
-
-
-trainEpochs(train_loader, test_loader, cnn, n_epochs=10, print_every=1, test_every=1)
-
 
 # _____________________________________________________________________________
 
