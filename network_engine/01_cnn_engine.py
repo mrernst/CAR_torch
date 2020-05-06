@@ -64,8 +64,8 @@ import math
 # custom functions
 # -----
 
-from datasets.dynaMO.dataset import dynaMODataset, ToTensor
-from utilities.hopfieldnetwork import HopfieldNet
+from utilities.dataset_handler import dynaMODataset, ToTensor
+from utilities.networks.buildingblocks.hopfield import HopfieldNet
 
 def asMinutes(s):
     m = math.floor(s / 60)

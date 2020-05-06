@@ -54,21 +54,74 @@ from torchvision import transforms, utils
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
+import torchvision.transforms as transforms
 
-import matplotlib.pyplot as plt
-import matplotlib.ticker as ticker
 
+import argparse
 import os
 import random
 import time
 import math
 
-
 # custom functions
 # -----
 
-from datasets.dynaMO.dataset import dynaMODataset, ToTensor
-from utilities.convlstm import ConvLSTMCell, ConvLSTM
+import utilities.helper as helper
+# network structure
+from utilities.networks.buildingblocks.convlstm import ConvLSTMCell, ConvLSTM
+# dataset
+from utilities.dataset_handler import dynaMODataset, ToTensor
+from utilities.lmdb_handler import ImageFolderLMDB
+
+
+# cross-platform development
+from platform import system
+IS_MACOSX = True if system() == 'Darwin' else False
+PWD_STEM = "/Users/markus/Research/Code/" if IS_MACOSX else "/home/mernst/git/"
+
+# commandline arguments
+# -----
+
+# FLAGS
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+     "-t",
+     "--testrun",
+     # type=bool,
+     default=False,
+     dest='testrun',
+     action='store_true',
+     help='reduced dataset configuration on local machine for testing')
+parser.add_argument(
+     "-c",
+     "--config_file",
+     type=str,
+     default=PWD_STEM +
+             'titan/experiments/001_noname_experiment/' +
+             'files/config_files/config0.csv',
+     help='path to the configuration file of the experiment')
+parser.add_argument(
+     "-n",
+     "--name",
+     type=str,
+     default='',
+     help='name of the run, i.e. iteration1')
+parser.add_argument(
+     "-r",
+     "--restore_ckpt",
+     type=bool,
+     default=True,
+     help='restore model from last checkpoint')
+
+FLAGS = parser.parse_args()
+
+
+CONFIG = helper.infer_additional_parameters(
+    helper.read_config_file(FLAGS.config_file)
+)
+
+
 
 
 def asMinutes(s):
@@ -415,16 +468,28 @@ predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5)
 # for i in range(2):
 #     out = evaluate(encoder, predictor, sample['image'][i:i+1], predict_for=100)
 
-dynaMo_train_transformed = dynaMODataset(
-    root_dir='./datasets/dynaMO/image_files/train/',
+# dynaMo_train_transformed = dynaMODataset(
+#     root_dir='../datasets/dynaMO/data/dynamo/train/',
+#     transform=transforms.Compose([
+#         ToTensor()
+#     ]))
+# 
+# dynaMo_test_transformed = dynaMODataset(
+#     root_dir='../datasets/dynaMO/data/dynamo/test/',
+#     transform=transforms.Compose([
+#         ToTensor()
+#     ]))
+
+dynaMo_train_transformed = ImageFolderLMDB(
+    db_path='../datasets/dynaMO/data/dynamo/train.lmdb',
     transform=transforms.Compose([
-        ToTensor()
+        transforms.ToTensor()
     ]))
 
-dynaMo_test_transformed = dynaMODataset(
-    root_dir='./datasets/dynaMO/image_files/test/',
+dynaMo_test_transformed = ImageFolderLMDB(
+    db_path='../datasets/dynaMO/data/dynamo/test.lmdb',
     transform=transforms.Compose([
-        ToTensor()
+        transforms.ToTensor()
     ]))
 
 dynaMO_trainset = DataLoader(dynaMo_train_transformed, batch_size=50,
