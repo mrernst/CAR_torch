@@ -56,7 +56,10 @@ class ImageFolderLMDB(data.Dataset):
         if self.target_transform is not None:
             target = self.target_transform(target)
 
-        return img, target
+        sample = {'image': img, 'target': target}
+        # return img, target
+        return sample
+
 
     def __len__(self):
         return self.length
@@ -93,7 +96,8 @@ def folder2lmdb(dpath, name="train", write_frequency=5000, num_workers=16):
 
     print("Generate LMDB to %s" % lmdb_path)
     db = lmdb.open(lmdb_path, subdir=isdir,
-                   map_size=1099511627776 * 2, readonly=False,
+                   map_size=1099511627776,
+                   readonly=False,
                    meminit=False, map_async=True)
     
     print(len(dataset), len(data_loader))
