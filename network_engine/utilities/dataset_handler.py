@@ -149,7 +149,8 @@ class ToTimeSeries(object):
 	def __init__(self, height=32, width=32):
 		self.height = height
 		self.width = width
-	def __call__(self, image_array):
+	def __call__(self, image):
+		image_array = np.array(image)
 		image_array = image_array.reshape(self.height, self.width, -1, order='F')
 		return image_array
 

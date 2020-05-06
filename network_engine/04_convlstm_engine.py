@@ -466,37 +466,39 @@ predictor = DecoderNetwork(input_dim=UNITS, hidden_dim=UNITS, kernel_size=(5, 5)
 # for i in range(2):
 #     out = evaluate(encoder, predictor, sample['image'][i:i+1], predict_for=100)
 
-dynaMo_train_transformed = dynaMODataset(
-    root_dir='../datasets/dynaMO/data/dynamo/train/',
-    transform=transforms.Compose([
-        ToTimeSeries(height=32, width=32),
-        transforms.ToTensor()
-    ]),
-    target_transform=transforms.Compose([
-        ToSingle()
-    ]))
-
-dynaMo_test_transformed = dynaMODataset(
-    root_dir='../datasets/dynaMO/data/dynamo/test/',
-    transform=transforms.Compose([
-        ToTimeSeries(height=32, width=32),
-        transforms.ToTensor()
-    ]),
-    target_transform=transforms.Compose([
-        ToSingle()
-    ]))
-
-# dynaMo_train_transformed = ImageFolderLMDB(
-#     db_path='../datasets/dynaMO/data/dynamo/train.lmdb',
+# dynaMo_train_transformed = dynaMODataset(
+#     root_dir='../datasets/dynaMO/data/dynamo/train/',
 #     transform=transforms.Compose([
+#         ToTimeSeries(height=32, width=32),
 #         transforms.ToTensor()
+#     ]),
+#     target_transform=transforms.Compose([
+#         ToSingle()
 #     ]))
 # 
-# dynaMo_test_transformed = ImageFolderLMDB(
-#     db_path='../datasets/dynaMO/data/dynamo/test.lmdb',
+# dynaMo_test_transformed = dynaMODataset(
+#     root_dir='../datasets/dynaMO/data/dynamo/test/',
 #     transform=transforms.Compose([
+#         ToTimeSeries(height=32, width=32),
 #         transforms.ToTensor()
+#     ]),
+#     target_transform=transforms.Compose([
+#         ToSingle()
 #     ]))
+
+dynaMo_train_transformed = ImageFolderLMDB(
+    db_path='../datasets/dynaMO/data/dynamo/train.lmdb',
+    transform=transforms.Compose([
+        ToTimeSeries(height=32, width=32),
+        transforms.ToTensor()
+    ]))
+
+dynaMo_test_transformed = ImageFolderLMDB(
+    db_path='../datasets/dynaMO/data/dynamo/test.lmdb',
+    transform=transforms.Compose([
+        ToTimeSeries(height=32, width=32),
+        transforms.ToTensor()
+    ]))
 
 dynaMO_trainset = DataLoader(dynaMo_train_transformed, batch_size=50,
                                shuffle=True, num_workers=0, drop_last=True)
