@@ -67,6 +67,8 @@ import math
 # -----
 import utilities.helper as helper
 from utilities.networks.buildingblocks.hopfield import HopfieldNet
+from utilities.networks.buildingblocks.rcnn import BLT_Network, B_Network
+
 from utilities.dataset_handler import ImageFolderLMDB
 
 
@@ -343,6 +345,25 @@ def test(test_loader, network, criterion, epoch):
     
     
     return loss /(i+1), accuracy/(i+1)
+
+def test_recurrent(test_loader, network, criterion, epoch):
+    loss = 0
+    with torch.no_grad():
+        for i, data in enumerate(test_loader):
+            input_tensor, target_tensor = data
+            input_tensor = input_tensor.unsqueeze(1)
+            input_tensor = input_tensor.repeat(1, 4, 1, 1, 1)
+            network_output = network(input_tensor)
+            for t in range(network_output.shape[1]):
+                loss += criterion(network_output[:,t,:], target_tensor)
+            loss /= test_loader.batch_size
+            topv, topi = network_output[:,t,:].topk(1)
+            accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+                dim=0, dtype=torch.float64) / topi.shape[0]
+
+    print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
+                                                       loss /(i+1), accuracy/(i+1)), end="\n")
+    return loss, accuracy
 
 
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
