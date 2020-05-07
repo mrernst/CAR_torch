@@ -303,6 +303,27 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
 
+def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
+
+    optimizer.zero_grad()
+
+    loss = 0
+    time = 3
+    input_tensor = input_tensor.unsqueeze(1)
+    input_tensor = input_tensor.repeat(1, time, 1, 1, 1)
+    network_output = network(input_tensor)
+
+    for t in range(network_output.shape[1]):
+        loss += criterion(network_output[:,t,:], target_tensor)
+
+    topv, topi = network_output[:,t,:].topk(1)
+    accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+        dim=0, dtype=torch.float64) / topi.shape[0]
+
+    loss.backward()
+    optimizer.step()
+    loss = loss / topi.shape[0]  # average loss per item
+    return loss.item(), accuracy.item()
 
 def test(test_loader, network, criterion, epoch):
     loss = 0

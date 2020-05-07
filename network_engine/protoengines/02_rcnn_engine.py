@@ -118,14 +118,14 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
 
-def train2(input_tensor, target_tensor, network, optimizer, criterion):
+def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
 
     optimizer.zero_grad()
 
     loss = 0
-
+    time = 3
     input_tensor = input_tensor.unsqueeze(1)
-    input_tensor = input_tensor.repeat(1, 3, 1, 1, 1)
+    input_tensor = input_tensor.repeat(1, time, 1, 1, 1)
     network_output = network(input_tensor)
 
     for t in range(network_output.shape[1]):
@@ -196,7 +196,7 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train2(sample_batched[0], sample_batched[1],
+            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
