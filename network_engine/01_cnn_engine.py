@@ -172,58 +172,6 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # -----------------
 
 
-class Lenet5(nn.Module):
-    def __init__(self):
-        super(StandardCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 8, padding=4)
-        self.pool1 = nn.MaxPool2d(4, 2, padding=1)
-        self.bn1 = nn.BatchNorm2d(6)
-        self.conv2 = nn.Conv2d(6, 16, 8, padding=4)
-        self.pool2 = nn.MaxPool2d(4, 2, padding=1)
-        self.bn2 = nn.BatchNorm2d(16)
-        self.fc1 = nn.Linear(16 * 7 * 7, 120)  # 32*6*6
-        self.fc2 = nn.Linear(120, 10)  # 32*6*6
-
-    def forward(self, x):
-        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        # print(x.shape)
-        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        # print(x.shape)
-
-        x = x.view(-1, 16 * 7 * 7)
-        # print(x.shape)
-
-        x = F.relu(self.fc1(x))
-        x = F.softmax(self.fc2(x), 1)
-        # print(x.shape)
-
-        return x
-
-
-class B_Network(nn.Module):
-    def __init__(self):
-        super(B_Network, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
-        self.pool1 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
-        self.pool2 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.fc1 = nn.Linear(32 * 8 * 8, 10) # 32 * 7 * 7 for MNIST
-
-    def forward(self, x):
-        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        # print(x.shape)
-        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        # print(x.shape)
-
-        x = x.view(-1, 32 * 8 * 8) # 32 * 7 * 7 for MNIST
-        # print(x.shape)
-
-        x = F.softmax(self.fc1(x), 1)
-        # print(x.shape)
-
-        return x
 
 class BH_Network(nn.Module):
     def __init__(self, i_factor=1, time_steps=2):

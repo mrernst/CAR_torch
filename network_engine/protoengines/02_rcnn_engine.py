@@ -158,7 +158,7 @@ def test(test_loader, network, criterion, epoch):
     return loss, accuracy
 
 
-def test2(test_loader, network, criterion, epoch):
+def test_recurrent(test_loader, network, criterion, epoch):
     loss = 0
     with torch.no_grad():
         for i, data in enumerate(test_loader):
@@ -190,7 +190,7 @@ def trainEpochs(train_loader, test_loader, network, n_epochs, print_every=1000, 
 
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test2(test_loader, network, criterion,
+            test_loss, test_accurary = test_recurrent(test_loader, network, criterion,
                                             epoch)
 
         start = time.time()

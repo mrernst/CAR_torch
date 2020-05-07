@@ -167,8 +167,8 @@ class RecConv(nn.Module):
         >> h = last_states[0][0]  # 0 for layer index, 0 for h index
     """
 
-    def __init__(self, input_dim, hidden_dim, kernel_size, num_layers,
-                 batch_first=False, bias=True, pooling=True):
+    def __init__(self, input_dim, hidden_dim, kernel_size,
+        num_layers, cell=RecConvCell, batch_first=False, bias=True, pooling=True):
         super(RecConv, self).__init__()
 
         self._check_kernel_size_consistency(kernel_size)
@@ -196,7 +196,7 @@ class RecConv(nn.Module):
         for i in range(0, self.num_layers):
             cur_input_dim = self.input_dim if i == 0 else self.hidden_dim[i - 1]
 
-            cell_list.append(RecConvCell(input_channels=cur_input_dim,
+            cell_list.append(cell(input_channels=cur_input_dim,
                                          output_channels=self.hidden_dim[i],
                                          output_channels_above=self.hidden_dim[i+1],
                                          kernel_size=self.kernel_size[i],
@@ -300,14 +300,14 @@ class BLT_Network(nn.Module):
     def __init__(self):
         super(BLT_Network, self).__init__()
         self.rcnn = RecConv(1,32,(3,3),2, batch_first=True)
-        self.fc = nn.Linear(32 * 7 * 7, 10)
+        self.fc = nn.Linear(32 * 8 * 8, 10)
 
     def forward(self, x):
         x = self.rcnn(x)
         seq_len = x.size(1)
         output_list = []
         for t in range(seq_len):
-            input = x[:, t, :, :, :].view(x.shape[0], 32 * 7 * 7)
+            input = x[:, t, :, :, :].view(x.shape[0], 32 * 8 * 8)
             output_list.append(F.softmax(self.fc(input), 1))
         x = torch.stack(output_list, dim=1)
         return x
@@ -323,7 +323,7 @@ class B_Network(nn.Module):
         self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
         self.bn2 = nn.BatchNorm2d(32)
-        self.fc1 = nn.Linear(32 * 7 * 7, 10)
+        self.fc1 = nn.Linear(32 * 8 * 8, 10)
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
@@ -331,7 +331,7 @@ class B_Network(nn.Module):
         x = self.pool2(F.relu(self.bn2(self.conv2(x))))
         # print(x.shape)
 
-        x = x.view(-1, 32 * 7 * 7)
+        x = x.view(-1, 32 * 8 * 8)
         # print(x.shape)
 
         x = F.softmax(self.fc1(x), 1)
