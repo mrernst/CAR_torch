@@ -304,14 +304,14 @@ def test_recurrent(test_loader, network, criterion, epoch):
             network_output = network(input_tensor)
             for t in range(network_output.shape[1]):
                 loss += criterion(network_output[:,t,:], target_tensor)
-            loss /= test_loader.batch_size
+            # loss /= test_loader.batch_size
             topv, topi = network_output[:,t,:].topk(1)
             accuracy = (topi == target_tensor.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
-    return loss, accuracy
+    return loss /(i+1), accuracy/(i+1)
 
 
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
@@ -329,7 +329,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test(test_loader, network, criterion,
+            test_loss, test_accurary = test_recurrent(test_loader, network, criterion,
                                             epoch)
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
@@ -338,7 +338,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train(sample_batched[0], sample_batched[1],
+            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
@@ -385,10 +385,9 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # -----------------
 
 # Training network
-# cnn = Lenet5().to(device)
-network = B_Network().to(device)
-# cnn = BH_Network().to(device)
-
+#network = B_Network().to(device)
+#network = BH_Network().to(device)
+network = BLT_Network().to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
@@ -420,7 +419,7 @@ loss_writer = SummaryWriter(output_dir)
 
 
 trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
-            test_every=1, print_every=1, plot_every=1, save_every=5, learning_rate=0.001, output_dir=output_dir, checkpoint_dir=checkpoint_dir)
+            test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
 # TODO: CONFIG['learning_rate']
 
