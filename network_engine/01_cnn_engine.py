@@ -50,7 +50,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
-from torchvision import transforms, utils
+from torchvision import transforms, utils, datasets
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -411,6 +411,15 @@ test_dataset = ImageFolderLMDB(
     transforms.Normalize((0.,), (1.,))
 ]))
 
+# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/', train=True, download=True, transform=transforms.Compose([
+#        transforms.ToTensor(),
+#        transforms.Normalize((0.,), (1.,))
+#    ]))
+# 
+# test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO', train=False, transform=transforms.Compose([
+#        transforms.ToTensor(),
+#        transforms.Normalize((0.,), (1.,))
+#    ]))
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=0)
 
