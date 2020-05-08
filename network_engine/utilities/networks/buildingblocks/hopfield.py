@@ -46,7 +46,7 @@
 # -----
 import torch
 import torch.nn as nn
-
+device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 # network class
 # -----
@@ -60,18 +60,18 @@ class HopfieldNet(object):
 
         self._weights = torch.zeros(size=(num_units, num_units),
                                     dtype=torch.float32,
-                                    requires_grad=False)
+                                    requires_grad=False, device=device)
 
         self._thresholds = torch.zeros(size=(num_units,),
                                        dtype=torch.float32,
-                                       requires_grad=False)
+                                       requires_grad=False, device=device)
         self._hebb_counter = torch.zeros(size=(),
                                          dtype=torch.int32,
-                                         requires_grad=False)
+                                         requires_grad=False, device=device)
 
         self._second_moment = torch.zeros(size=self._weights.shape,
                                           dtype=self._weights.dtype,
-                                          requires_grad=False)
+                                          requires_grad=False, device=device)
 
 
     @property

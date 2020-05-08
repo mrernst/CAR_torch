@@ -201,7 +201,7 @@ class BH_Network(nn.Module):
         self.act1 = y.detach()
         for t in range(self.time_steps):
             y = self.hnet1.step(y)
-        y = y.view(b,c,h,w).type(dtype=torch.float32).to(device)
+        y = y.view(b,c,h,w).type(dtype=torch.float32)
         y = y * 2 - 1 * self.i_factor # reshape again
         x += y
 
@@ -217,7 +217,7 @@ class BH_Network(nn.Module):
         self.act2 = y.detach()
         for t in range(self.time_steps):
             y = self.hnet2.step(y)
-        y = y.view(b,c,h,w).type(dtype=torch.float32).to(device)
+        y = y.view(b,c,h,w).type(dtype=torch.float32)
         y = y * 2 - 1 * self.i_factor # reshape again
         x += y
 
