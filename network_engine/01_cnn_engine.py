@@ -231,7 +231,7 @@ class BH_Network(nn.Module):
 def train(input_tensor, target_tensor, network, optimizer, criterion):
 
     optimizer.zero_grad()
-
+    input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
     loss = 0
 
     input_tensor = input_tensor[:, 0:1, :, :]
@@ -247,8 +247,8 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.step()
 
     # update the hopfield networks for B-H
-    #network.hnet1.covariance_update(network.act1)
-    #network.hnet2.covariance_update(network.act2)
+    network.hnet1.covariance_update(network.act1)
+    network.hnet2.covariance_update(network.act2)
 
     loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
@@ -256,7 +256,7 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
 def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
 
     optimizer.zero_grad()
-
+    input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
     loss = 0
     time = 3
     input_tensor = input_tensor.unsqueeze(1)
@@ -281,6 +281,7 @@ def test(test_loader, network, criterion, epoch):
     with torch.no_grad():
         for i, data in enumerate(test_loader):
             input_tensor, target_tensor = data
+            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
             network_output = network(input_tensor)
             loss += criterion(network_output, target_tensor) / \
                 test_loader.batch_size
@@ -296,17 +297,19 @@ def test(test_loader, network, criterion, epoch):
 
 def test_recurrent(test_loader, network, criterion, epoch):
     loss = 0
+    accuracy = 0
     with torch.no_grad():
         for i, data in enumerate(test_loader):
             input_tensor, target_tensor = data
+            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
             input_tensor = input_tensor.unsqueeze(1)
             input_tensor = input_tensor.repeat(1, 4, 1, 1, 1)
             network_output = network(input_tensor)
             for t in range(network_output.shape[1]):
                 loss += criterion(network_output[:,t,:], target_tensor)
-            # loss /= test_loader.batch_size
+            loss /= test_loader.batch_size
             topv, topi = network_output[:,t,:].topk(1)
-            accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
@@ -329,7 +332,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test_recurrent(test_loader, network, criterion,
+            test_loss, test_accurary = test(test_loader, network, criterion,
                                             epoch)
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
@@ -338,7 +341,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
+            loss, accuracy = train(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
@@ -386,8 +389,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 
 # Training network
 #network = B_Network().to(device)
-#network = BH_Network().to(device)
-network = BLT_Network().to(device)
+network = BH_Network().to(device)
+#network = BLT_Network().to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(

@@ -45,6 +45,7 @@
 # standard libraries
 # -----
 import torch
+import torch.nn as nn
 
 
 # network class
@@ -71,6 +72,7 @@ class HopfieldNet(object):
         self._second_moment = torch.zeros(size=self._weights.shape,
                                           dtype=self._weights.dtype,
                                           requires_grad=False)
+
 
     @property
     def weights(self):
