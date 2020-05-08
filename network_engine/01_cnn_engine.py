@@ -188,7 +188,7 @@ class BH_Network(nn.Module):
         self.bn2 = nn.BatchNorm2d(32)
         self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
         self.fc1 = nn.Linear(32 * 8 * 8, 10)
-
+    # TODO: change this to be more CUDA friendly, not just put it on the GPU
     def forward(self, x):
         # layer 1
         x = self.conv1(x)
@@ -201,7 +201,8 @@ class BH_Network(nn.Module):
         self.act1 = y.detach()
         for t in range(self.time_steps):
             y = self.hnet1.step(y)
-        y = y.view(b,c,h,w).type(dtype=torch.float32) * 2 - 1 * self.i_factor # reshape again
+        y = y.view(b,c,h,w).type(dtype=torch.float32).to(device)
+        y = y * 2 - 1 * self.i_factor # reshape again
         x += y
 
         # layer 2
@@ -216,7 +217,8 @@ class BH_Network(nn.Module):
         self.act2 = y.detach()
         for t in range(self.time_steps):
             y = self.hnet2.step(y)
-        y = y.view(b,c,h,w).type(dtype=torch.float32) * 2 - 1 * self.i_factor # reshape again
+        y = y.view(b,c,h,w).type(dtype=torch.float32).to(device)
+        y = y * 2 - 1 * self.i_factor # reshape again
         x += y
 
         # fc and out
