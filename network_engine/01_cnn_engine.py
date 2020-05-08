@@ -188,7 +188,7 @@ class BH_Network(nn.Module):
         self.bn2 = nn.BatchNorm2d(32)
         self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
         self.fc1 = nn.Linear(32 * 8 * 8, 10)
-    # TODO: change this to be more CUDA friendly, not just put it on the GPU
+
     def forward(self, x):
         # layer 1
         x = self.conv1(x)
