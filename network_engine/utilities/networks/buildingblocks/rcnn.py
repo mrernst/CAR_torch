@@ -313,17 +313,54 @@ class BLT_Network(nn.Module):
         return x
 
 
+# TODO reimplement BL and BLT, make options for B to be BK and BF
+class BL_Network(nn.Module):
+    def __init__(self):
+        assert False, 'module is not yet implemented'
+        super(BL_Network, self).__init__()
+        self.rcnn = RecConv(1,32,(3,3),2, batch_first=True)
+        self.fc = nn.Linear(32 * 8 * 8, 10)
+
+    def forward(self, x):
+        x = self.rcnn(x)
+        seq_len = x.size(1)
+        output_list = []
+        for t in range(seq_len):
+            input = x[:, t, :, :, :].view(x.shape[0], 32 * 8 * 8)
+            output_list.append(F.softmax(self.fc(input), 1))
+        x = torch.stack(output_list, dim=1)
+        return x
+
+class BT_Network(nn.Module):
+    def __init__(self):
+        assert False, 'module is not yet implemented'
+        super(BT_Network, self).__init__()
+        self.rcnn = RecConv(1,32,(3,3),2, batch_first=True)
+        self.fc = nn.Linear(32 * 8 * 8, 10)
+
+    def forward(self, x):
+        x = self.rcnn(x)
+        seq_len = x.size(1)
+        output_list = []
+        for t in range(seq_len):
+            input = x[:, t, :, :, :].view(x.shape[0], 32 * 8 * 8)
+            output_list.append(F.softmax(self.fc(input), 1))
+        x = torch.stack(output_list, dim=1)
+        return x
+
 
 class B_Network(nn.Module):
-    def __init__(self):
+    def __init__(self, kernel=3, filters=32):
+        self.kernel = kernel
+        self.filters = filters
         super(B_Network, self).__init__()
-        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
+        self.conv1 = nn.Conv2d(1, self.filters, self.kernel, padding=1)
         self.pool1 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+        self.bn1 = nn.BatchNorm2d(self.filters)
+        self.conv2 = nn.Conv2d(self.filters, self.filters, self.kernel, padding=1)
         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.fc1 = nn.Linear(32 * 8 * 8, 10)
+        self.bn2 = nn.BatchNorm2d(self.filters)
+        self.fc1 = nn.Linear(self.filters * 8 * 8, 10)
 
     def forward(self, x):
         x = self.pool1(F.relu(self.bn1(self.conv1(x))))
