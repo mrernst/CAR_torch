@@ -136,7 +136,7 @@ class SbatchDocument(object):
             "#SBATCH --cpus-per-task=4 \n" + \
             "#SBATCH --time=700:00:00 \n" + \
             "#SBATCH --mem={}GB \n".format(args.memory) + \
-            # "#SBATCH --reservation triesch-shared \n" + \
+            "#SBATCH --reservation triesch-shared \n" + \
             "#SBATCH --partition=sleuths \n" + \
             "#SBATCH --job-name={} \n".format(self.experiment_name) + \
             "#SBATCH --mail-type=END \n" + \
