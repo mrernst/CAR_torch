@@ -236,8 +236,6 @@ class RecConv(nn.Module):
                                              image_size=(h, w),
                                              pooling=self.pooling)
 
-        #print('a', hidden_state[0][0].shape, hidden_state[0][1].shape)
-        #print('a', hidden_state[1][0].shape, hidden_state[1][1].shape)
         seq_len = input_tensor.size(1)
         output_inner = []
 
@@ -263,8 +261,6 @@ class RecConv(nn.Module):
             for layer_idx in range(self.num_layers - 1):
                 hidden_state[layer_idx] = (layer_output_list[layer_idx], layer_output_list[layer_idx+1])
             hidden_state[self.num_layers - 1] = (layer_output_list[self.num_layers - 1], hidden_state[self.num_layers - 1][-1])
-            #print('b', hidden_state[0][0].shape, hidden_state[0][1].shape)
-            #print('b', hidden_state[1][0].shape, hidden_state[1][1].shape)
 
             output_inner.append(cur_layer_input)
 
