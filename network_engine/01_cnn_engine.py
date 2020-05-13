@@ -50,7 +50,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
-from torchvision import transforms, utils, datasets
+from torchvision import utils, datasets
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -67,7 +67,7 @@ import math
 # -----
 import utilities.helper as helper
 from utilities.networks.buildingblocks.hopfield import HopfieldNet
-from utilities.networks.buildingblocks.rcnn import BLT_Network, B_Network
+from utilities.networks.buildingblocks.rcnn import RecConvNet, B_Network
 
 from utilities.dataset_handler import ImageFolderLMDB
 
@@ -438,10 +438,6 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                 checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
 
 
-    showPlot(plot_losses)
-    plt.show()
-
-
 # -----------------
 # Main Training Loop
 # -----------------
@@ -449,7 +445,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # Training network
 #network = B_Network().to(device)
 network = BH_Network().to(device)
-#network = BLT_Network().to(device)
+network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3)).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
@@ -492,7 +488,6 @@ loss_writer = SummaryWriter(output_dir)
 trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
             test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
-# TODO: CONFIG['learning_rate']
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
 # TODO: Implement general checkpointing in trainEpochs
