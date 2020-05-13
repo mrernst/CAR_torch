@@ -52,6 +52,79 @@ import torch
 # -----
 
 # -----------------
+# Network Constructor
+# -----------------
+
+def constructor(name,
+                configuration_dict,
+                is_training,
+                keep_prob,
+                custom_net_parameters=None):
+    """
+    constructor takes a name, a configuration dict the booleans is_training,
+    keep_prob and optionally a custom_net_parameters dict and returns
+    an initialized NetworkClass instance.
+    """
+    assert False, 'not yet implemented for pytorch'
+
+    def get_net_parameters(configuration_dict):
+        net_param_dict = {}
+        receptive_pixels = 3  # 3
+        n_features = 32
+        feature_multiplier = configuration_dict['feature_multiplier']
+
+        if "F" in configuration_dict['connectivity']:
+            n_features = 64
+        if "K" in configuration_dict['connectivity']:
+            receptive_pixels = 5  # 5
+
+        net_param_dict["activations"] = [bb.lrn_relu, bb.lrn_relu, tf.identity]
+        net_param_dict["conv_filter_shapes"] = [
+            [receptive_pixels, receptive_pixels,
+                configuration_dict['image_channels'], n_features],
+            [receptive_pixels, receptive_pixels, n_features,
+                configuration_dict['feature_multiplier'] * n_features]
+                                               ]
+        net_param_dict["bias_shapes"] = [
+            [1, configuration_dict['image_height'],
+                configuration_dict['image_width'], n_features],
+            [1, int(np.ceil(configuration_dict['image_height']/2)),
+                int(np.ceil(configuration_dict['image_width']/2)),
+                configuration_dict['feature_multiplier']*n_features],
+            [1, configuration_dict['classes']]]
+        net_param_dict["ksizes"] = [
+            [1, 2, 2, 1], [1, 2, 2, 1]]
+        net_param_dict["pool_strides"] = [[1, 2, 2, 1], [1, 2, 2, 1]]
+        net_param_dict["topdown_filter_shapes"] = [
+            [receptive_pixels, receptive_pixels, n_features,
+                feature_multiplier * n_features]]
+        net_param_dict["topdown_output_shapes"] = [
+            [configuration_dict['batchsize'],
+                configuration_dict['image_height'],
+                configuration_dict['image_width'],
+                n_features]]
+
+        net_param_dict["global_weight_init_mean"] = \
+            configuration_dict['global_weight_init_mean']
+        net_param_dict["global_weight_init_std"] = \
+            configuration_dict['global_weight_init_std']
+
+        return net_param_dict
+
+    if custom_net_parameters:
+        net_parameters = custom_net_parameters
+    else:
+        net_parameters = get_net_parameters(configuration_dict)
+
+    # copy necessary items from configuration
+    net_parameters['connectivity'] = configuration_dict['connectivity']
+    net_parameters['batchnorm'] = configuration_dict['batchnorm']
+
+    return NetworkClass(name, net_parameters, is_training, keep_prob)
+
+
+
+# -----------------
 # RC Classes
 # -----------------
 
@@ -59,7 +132,7 @@ import torch
 class RecConvCell(nn.Module):
     """docstring for RCCell."""
 
-    def __init__(self, input_channels, output_channels, output_channels_above, kernel_size, bias):
+    def __init__(self, connectivity, input_channels, output_channels, output_channels_above, kernel_size, bias):
         """
         Initialize ConvLSTM cell.
 
@@ -76,7 +149,7 @@ class RecConvCell(nn.Module):
         """
         super(RecConvCell, self).__init__()
         
-        self.configuration = 'BLT'
+        self.connectivity = connectivity
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.output_channels_above = output_channels_above
@@ -120,15 +193,15 @@ class RecConvCell(nn.Module):
     def forward(self, b_input, l_input, t_input):
         b_conv = self.bn_b(self.bottomup(b_input))
 
-        if 'BLT' in self.configuration:
+        if 'BLT' in self.connectivity:
             l_conv = self.bn_l(self.lateral(l_input))
             t_conv = self.bn_t(self.topdown(t_input))
             next_state = self.lrn(self.activation(b_conv + l_conv + t_conv))
-        elif 'BL' in self.configuration:
+        elif 'BL' in self.connectivity:
             l_conv = self.bn_l(self.lateral(l_input))
             next_state = self.lrn(self.activation(b_conv + l_conv))
 
-        elif 'BT' in self.configuration:
+        elif 'BT' in self.connectivity:
             t_conv = self.bn_t(self.topdown(t_input))
             next_state = self.lrn(self.activation(b_conv + t_conv))
         else:
@@ -176,8 +249,8 @@ class RecConv(nn.Module):
         >> h = last_states[0][0]  # 0 for layer index, 0 for h index
     """
 
-    def __init__(self, input_dim, hidden_dim, kernel_size,
-        num_layers, cell=RecConvCell, batch_first=False, bias=True, pooling=True):
+    def __init__(self, connectivity, input_dim, hidden_dim, kernel_size,
+        num_layers, batch_first=False, bias=True, pooling=True):
         super(RecConv, self).__init__()
 
         self._check_kernel_size_consistency(kernel_size)
@@ -205,7 +278,8 @@ class RecConv(nn.Module):
         for i in range(0, self.num_layers):
             cur_input_dim = self.input_dim if i == 0 else self.hidden_dim[i - 1]
 
-            cell_list.append(cell(input_channels=cur_input_dim,
+            cell_list.append(RecConvCell(connectivity=connectivity,
+                                         input_channels=cur_input_dim,
                                          output_channels=self.hidden_dim[i],
                                          output_channels_above=self.hidden_dim[i+1],
                                          kernel_size=self.kernel_size[i],
@@ -301,46 +375,11 @@ class RecConv(nn.Module):
 
 
 
-class BLT_Network(nn.Module):
-    def __init__(self):
-        super(BLT_Network, self).__init__()
-        self.rcnn = RecConv(1,32,(3,3),2, batch_first=True)
-        self.fc = nn.Linear(32 * 8 * 8, 10)
-
-    def forward(self, x):
-        x = self.rcnn(x)
-        seq_len = x.size(1)
-        output_list = []
-        for t in range(seq_len):
-            input = x[:, t, :, :, :].view(x.shape[0], 32 * 8 * 8)
-            output_list.append(F.softmax(self.fc(input), 1))
-        x = torch.stack(output_list, dim=1)
-        return x
-
-
-# TODO reimplement BL and BLT, make options for B to be BK and BF
-class BL_Network(nn.Module):
-    def __init__(self):
-        assert False, 'module is not yet implemented'
-        super(BL_Network, self).__init__()
-        self.rcnn = RecConv(1,32,(3,3),2, batch_first=True)
-        self.fc = nn.Linear(32 * 8 * 8, 10)
-
-    def forward(self, x):
-        x = self.rcnn(x)
-        seq_len = x.size(1)
-        output_list = []
-        for t in range(seq_len):
-            input = x[:, t, :, :, :].view(x.shape[0], 32 * 8 * 8)
-            output_list.append(F.softmax(self.fc(input), 1))
-        x = torch.stack(output_list, dim=1)
-        return x
-
-class BT_Network(nn.Module):
-    def __init__(self):
-        assert False, 'module is not yet implemented'
-        super(BT_Network, self).__init__()
-        self.rcnn = RecConv(1,32,(3,3),2, batch_first=True)
+class RecConvNet(nn.Module):
+    def __init__(self, connectivity, kernel_size, input_channels=1, n_features=32, num_layers=2):
+        super(RecConvNet, self).__init__()
+        self.rcnn = RecConv(connectivity, input_channels, n_features, kernel_size, num_layers, batch_first=True)
+        num_layers, batch_first=False, bias=True, pooling=True):
         self.fc = nn.Linear(32 * 8 * 8, 10)
 
     def forward(self, x):
