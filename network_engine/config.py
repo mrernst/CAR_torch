@@ -82,7 +82,6 @@ def get_par():
     par['BLT_longrange'] = [0]
     par['time_depth'] = [3]
     par['time_depth_beyond'] = [0]
-    par['feature_multiplier'] = [1]
     par['keep_prob'] = [1.0]
 
     par['stereo'] = [False]
