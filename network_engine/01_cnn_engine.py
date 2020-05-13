@@ -198,7 +198,7 @@ class BH_Network(nn.Module):
 
         b, c, h, w = x.shape
         y = (x > x.mean()).view(b, -1) # reshape here
-        self.act1 = y.detach()
+        self.act1 = y.clone().detach()
         for t in range(self.time_steps):
             y = self.hnet1.step(y)
         y = y.view(b,c,h,w).type(dtype=torch.float32)
@@ -214,7 +214,7 @@ class BH_Network(nn.Module):
 
         b, c, h, w = x.shape
         y = (x > x.mean()).view(b, -1)
-        self.act2 = y.detach()
+        self.act2 = y.clone().detach()
         for t in range(self.time_steps):
             y = self.hnet2.step(y)
         y = y.view(b,c,h,w).type(dtype=torch.float32)
