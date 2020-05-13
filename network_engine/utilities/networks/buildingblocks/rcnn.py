@@ -75,7 +75,8 @@ class RecConvCell(nn.Module):
             Whether or not to add the bias.
         """
         super(RecConvCell, self).__init__()
-
+        
+        self.configuration = 'BLT'
         self.input_channels = input_channels
         self.output_channels = output_channels
         self.output_channels_above = output_channels_above
@@ -117,14 +118,22 @@ class RecConvCell(nn.Module):
 
 
     def forward(self, b_input, l_input, t_input):
-
         b_conv = self.bn_b(self.bottomup(b_input))
-        l_conv = self.bn_l(self.lateral(l_input))
-        t_conv = self.bn_t(self.topdown(t_input))
 
-        next_state = self.lrn(
-            self.activation(b_conv + l_conv + t_conv))
+        if 'BLT' in self.configuration:
+            l_conv = self.bn_l(self.lateral(l_input))
+            t_conv = self.bn_t(self.topdown(t_input))
+            next_state = self.lrn(self.activation(b_conv + l_conv + t_conv))
+        elif 'BL' in self.configuration:
+            l_conv = self.bn_l(self.lateral(l_input))
+            next_state = self.lrn(self.activation(b_conv + l_conv))
 
+        elif 'BT' in self.configuration:
+            t_conv = self.bn_t(self.topdown(t_input))
+            next_state = self.lrn(self.activation(b_conv + t_conv))
+        else:
+            next_state = self.lrn(self.activation(b_conv))
+            
         return next_state
 
     def init_hidden(self, batch_size, image_size):
@@ -235,21 +244,21 @@ class RecConv(nn.Module):
             hidden_state = self._init_hidden(batch_size=b,
                                              image_size=(h, w),
                                              pooling=self.pooling)
-
+        
         seq_len = input_tensor.size(1)
         output_inner = []
-
+    
         for t in range(seq_len):
             layer_output_list = []
             cur_layer_input = input_tensor[:, t, :, :, :]
             for layer_idx in range(self.num_layers):
                 l, td = hidden_state[layer_idx]
-
+                
                 cur_layer_input = self.cell_list[layer_idx](
                     b_input=cur_layer_input,
                     l_input=l,
                     t_input=td)
-
+                    
                 layer_output_list.append(cur_layer_input)
 
                 if self.pooling:
