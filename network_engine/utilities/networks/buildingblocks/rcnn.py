@@ -379,7 +379,6 @@ class RecConvNet(nn.Module):
     def __init__(self, connectivity, kernel_size, input_channels=1, n_features=32, num_layers=2):
         super(RecConvNet, self).__init__()
         self.rcnn = RecConv(connectivity, input_channels, n_features, kernel_size, num_layers, batch_first=True)
-        num_layers, batch_first=False, bias=True, pooling=True):
         self.fc = nn.Linear(32 * 8 * 8, 10)
 
     def forward(self, x):
