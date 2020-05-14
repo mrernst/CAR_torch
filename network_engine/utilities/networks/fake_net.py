@@ -52,14 +52,15 @@ import torch.nn.functional as F
 
 # custom functions
 # -----
-from utilities.networks.buildingblocks.convlstm import ConvLSTMCell, ConvLSTM
-from utilities.dataset_handler import dynaMODataset, ToTimeSeries, ToSingle
+#from utilities.networks.buildingblocks.convlstm import ConvLSTMCell, ConvLSTM
+#from utilities.dataset_handler import dynaMODataset, ToTimeSeries, ToSingle
 
+# TODO: make this a real network container
 
 # _____________________________________________________________________________
 
 def return_network_layers(connectivity):
-	return 4
+	return 2
 
 # -----------------
 # top-level comment
