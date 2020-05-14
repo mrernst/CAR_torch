@@ -409,7 +409,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
             plot_accuracy_total += accuracy
 
             if (epoch * len_of_data + i_batch) % print_every == 0:
-                divisor = 1 if (epoch * len_of_data + i_batch) // print_every == 0 else plot_every
+                divisor = 1 if (epoch * len_of_data + i_batch) // print_every == 0 else print_every
                 print_loss_avg = print_loss_total / divisor
                 print_loss_total = 0
                 print_accuracy_avg = print_accuracy_total / divisor
