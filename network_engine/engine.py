@@ -479,9 +479,9 @@ test_dataset = ImageFolderLMDB(
 #        transforms.Normalize((0.,), (1.,))
 #    ]))
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=0)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=0)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
 
 # Tensorboard Writer
