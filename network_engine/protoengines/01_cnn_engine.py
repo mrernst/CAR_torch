@@ -488,7 +488,7 @@ loss_writer = SummaryWriter(output_dir)
 
 
 trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
-            test_every=CONFIG['test_every'], print_every=1, plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
+            test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
