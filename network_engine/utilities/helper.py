@@ -106,8 +106,10 @@ def print_tensor_info(tensor, name=None):
     Takes a torch.tensor and returns name and shape for debugging purposes
     """
     name = name if name else tensor.names
-    text = "[DEBUG] name = {}, shape = {}, dtype = {}, device = {}"
-    print(text.format(name, list(tensor.shape), tensor.dtype, tensor.device.type))
+    text = "[DEBUG] name = {}, shape = {}, dtype = {}, device = {} \n" + \
+        "\t min = {}, max = {}, std = {}, mean = {}"
+    print(text.format(name, list(tensor.shape), tensor.dtype, tensor.device.type,
+        tensor.min(), tensor.max(), tensor.type(torch.float).std(), tensor.type(torch.float).mean()))
     pass
 
 
