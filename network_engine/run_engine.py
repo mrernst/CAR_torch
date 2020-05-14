@@ -158,8 +158,6 @@ class SbatchDocument(object):
             '    echo "iteration $i" \n' + \
             '    echo "job $j" \n' + \
             '    srun python3 engine.py' + \
-            # ' --testrun=false' + \
-            # ' --restore_ckpt=true' + \
             ' --config_file ${config_array[$j]}' + \
             ' --name i$i\n' + \
             'done \n'
