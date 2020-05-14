@@ -69,7 +69,7 @@ def get_par():
 
     par = {}
 
-    par['exp_name'] = ["osmnist2_hopfield_test"]
+    par['exp_name'] = ["osmnist2_rcnn_test"]
     # par['name'] must be defined as a FLAG to engine, b/c it resembles the
     # iteration number that gets passed by the sbatch script
     # TODO: add documentation i.e. parameter possibilities
@@ -78,7 +78,7 @@ def get_par():
     par['n_occluders'] = [2]
     par['occlusion_percentage'] = [0]
     par['label_type'] = ["onehot"] #["onehot"]
-    par['connectivity'] = ['B', 'BLT', 'BH']#['B', 'BF', 'BK', 'BT', 'BL', 'BLT'] # ['BD', 'BT', 'BL', 'BLT'] # ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['BLT']
+    par['connectivity'] = ['B', 'BT', 'BL' 'BLT']#['B', 'BF', 'BK', 'BT', 'BL', 'BLT'] # ['BD', 'BT', 'BL', 'BLT'] # ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['BLT']
     par['BLT_longrange'] = [0]
     par['time_depth'] = [3]
     par['time_depth_beyond'] = [0]
