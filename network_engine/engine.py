@@ -317,7 +317,8 @@ def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.zero_grad()
     input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
     loss = 0
-    timesteps = 3
+    # TODO: Solve the timestep handling as a function parameter
+    timesteps = CONFIG['time_depth'] + 1
     input_tensor = input_tensor.unsqueeze(1)
     input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
     network_output = network(input_tensor)
@@ -357,7 +358,8 @@ def test(test_loader, network, criterion, epoch):
 def test_recurrent(test_loader, network, criterion, epoch):
     loss = 0
     accuracy = 0
-    timesteps = 3
+    # TODO: Solve the timestep handling as a function parameter
+    timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
     with torch.no_grad():
         for i, data in enumerate(test_loader):
             input_tensor, target_tensor = data
