@@ -4,7 +4,7 @@
 # _____________________________________________________________________________
 #
 #                                                                         _.oo.
-# April 2020                                     _.u[[/;:,.         .odMMMMMM'
+# May 2020                                       _.u[[/;:,.         .odMMMMMM'
 #                                             .o888UU[[[/;:-.  .o@P^    MMM^
 # protocnn.py                                oN88888UU[[[/;::-.        dP^
 # Description Description                   dNMMNN888UU[[[/;:--.   .o@P^
