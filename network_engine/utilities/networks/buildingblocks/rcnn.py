@@ -404,11 +404,12 @@ class B_Network(nn.Module):
         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
         self.bn2 = nn.BatchNorm2d(self.filters)
         self.fc1 = nn.Linear(self.filters * 8 * 8, 10)
+        self.lrn = nn.LocalResponseNorm(2, alpha=0.0001, beta=0.75, k=1.0)
 
     def forward(self, x):
-        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
+        x = self.pool1(self.lrn(F.relu(self.bn1(self.conv1(x)))))
         # print(x.shape)
-        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
+        x = self.pool2(self.lrn(F.relu(self.bn2(self.conv2(x)))))
         # print(x.shape)
 
         x = x.view(-1, 32 * 8 * 8)
