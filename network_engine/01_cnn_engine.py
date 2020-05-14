@@ -408,10 +408,11 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
             print_accuracy_total += accuracy
             plot_accuracy_total += accuracy
 
-            if i_batch % print_every == 0:
-                print_loss_avg = print_loss_total / print_every
+            if (epoch * len_of_data + i_batch) % print_every == 0:
+                divisor = 1 if (epoch * len_of_data + i_batch) // print_every == 0 else plot_every
+                print_loss_avg = print_loss_total / divisor
                 print_loss_total = 0
-                print_accuracy_avg = print_accuracy_total / print_every
+                print_accuracy_avg = print_accuracy_total / divisor
                 print_accuracy_total = 0
                 print(" " * 80 + "\r" +
                       '[Training:] E%d: %s (%d %d%%) %.4f %.4f'
@@ -419,9 +420,12 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                           i_batch, (i_batch + 1) / len_of_data * 100,
                           print_loss_avg, print_accuracy_avg), end="\r")
 
-            if i_batch % plot_every == 0:
-                plot_loss_avg = plot_loss_total / plot_every
-                plot_accuracy_avg = plot_accuracy_total / plot_every
+            if (epoch * len_of_data + i_batch) % plot_every == 0:
+                divisor = 1 if (epoch * len_of_data + i_batch) // plot_every == 0 else plot_every
+                plot_loss_avg = plot_loss_total / divisor
+                plot_loss_total = 0
+                plot_accuracy_avg = plot_accuracy_total / divisor
+                plot_accuracy_total = 0
 
                 plot_losses.append(plot_loss_avg)
                 
@@ -431,8 +435,6 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                 writer.add_scalar(
                     'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
             
-                plot_loss_total = 0
-                plot_accuracy_total = 0
                 
         if epoch % save_every == 0:
                 checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
@@ -445,7 +447,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # Training network
 #network = B_Network().to(device)
 network = BH_Network().to(device)
-network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3)).to(device)
+#network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3)).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
@@ -486,7 +488,7 @@ loss_writer = SummaryWriter(output_dir)
 
 
 trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
-            test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
+            test_every=CONFIG['test_every'], print_every=1, plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
