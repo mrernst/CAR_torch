@@ -231,54 +231,8 @@ class BLH_Network(nn.Module):
     def __init__(self, i_factor=1, time_steps=2):
         assert False, 'module not yet implemented'
         super(BLH_Network, self).__init__()
-        self.i_factor = i_factor
-        self.time_steps = time_steps
-
-        self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
-        self.pool1 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn1 = nn.BatchNorm2d(32)
-        self.hnet1 = HopfieldNet(32 * 16 * 16) # 32 * 14 * 14 for MNIST
-        self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
-        self.pool2 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn2 = nn.BatchNorm2d(32)
-        self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
-        self.fc1 = nn.Linear(32 * 8 * 8, 10)
 
     def forward(self, x):
-        # layer 1
-        x = self.conv1(x)
-        x = self.bn1(x)
-        x = F.relu(x)
-        x = self.pool1(x)
-
-        b, c, h, w = x.shape
-        y = (x > x.mean()).view(b, -1) # reshape here
-        self.act1 = y.detach()
-        for t in range(self.time_steps):
-            y = self.hnet1.step(y)
-        y = y.view(b,c,h,w).type(dtype=torch.float32)
-        y = y * 2 - 1 * self.i_factor # reshape again
-        x += y
-
-        # layer 2
-
-        x = self.conv2(x)
-        x = self.bn2(x)
-        x = F.relu(x)
-        x = self.pool2(x)
-
-        b, c, h, w = x.shape
-        y = (x > x.mean()).view(b, -1)
-        self.act2 = y.detach()
-        for t in range(self.time_steps):
-            y = self.hnet2.step(y)
-        y = y.view(b,c,h,w).type(dtype=torch.float32)
-        y = y * 2 - 1 * self.i_factor # reshape again
-        x += y
-
-        # fc and out
-        x = x.view(-1, 32 * 8 * 8)
-        x = F.softmax(self.fc1(x), 1)
         return x
 
 
