@@ -450,7 +450,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # Training network
 #network = B_Network().to(device)
 #network = BH_Network().to(device)
-network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3)).to(device)
+network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=64).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
