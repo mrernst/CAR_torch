@@ -6,9 +6,9 @@
 #                                                                         _.oo.
 # May 2020                                       _.u[[/;:,.         .odMMMMMM'
 #                                             .o888UU[[[/;:-.  .o@P^    MMM^
-# protocnn.py                                oN88888UU[[[/;::-.        dP^
-# Description Description                   dNMMNN888UU[[[/;:--.   .o@P^
-# Description Description                  ,MMMMMMN888UU[[/;::-. o@^
+# engine.py                                  oN88888UU[[[/;::-.        dP^
+# The main file including                   dNMMNN888UU[[[/;:--.   .o@P^
+# the training loop                       ,MMMMMMN888UU[[/;::-. o@^
 #                                          NNMMMNN888UU[[[/~.o@P^
 # Markus Ernst                             888888888UU[[[/o@^-..
 #                                         oI8888UU[[[/o@P^:--..
