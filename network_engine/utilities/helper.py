@@ -115,9 +115,9 @@ def print_tensor_info(tensor, name=None):
 
 def infer_additional_parameters(configuration_dict):
     """
-        infer_additional_parameters takes a dict configuration_dict and infers
-        additional parameters on the grounds of dataset etc.
-        """
+    infer_additional_parameters takes a dict configuration_dict and infers
+    additional parameters on the grounds of dataset etc.
+    """
     # define correct network parameters
     # -----
 
