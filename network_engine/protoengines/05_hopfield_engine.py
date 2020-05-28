@@ -269,8 +269,8 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.step()
 
     # update the hopfield networks for B-H
-    # network.hnet1.covariance_update(network.act1)
-    # network.hnet2.covariance_update(network.act2)
+    network.hnet1.covariance_update(network.act1)
+    network.hnet2.covariance_update(network.act2)
     # look at the patterns that the network stores..
     # think of Hnet as clustering algorithm
 
@@ -359,7 +359,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test_recurrent(test_loader, network, criterion,
+            test_loss, test_accurary = test(test_loader, network, criterion,
                                             epoch)
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
@@ -371,7 +371,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         # rewrite the write down and evaluation.
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
+            loss, accuracy = train(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
@@ -417,8 +417,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 
 # Training network
 #network = B_Network().to(device)
-#network = BH_Network().to(device)
-network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=64).to(device)
+network = BH_Network().to(device)
+#network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=64).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
