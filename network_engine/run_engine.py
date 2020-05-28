@@ -52,26 +52,6 @@ import csv
 import itertools
 import argparse
 
-
-# custom functions
-# -----
-from config import get_par, get_aux
-
-
-def mkdir_p(path):
-    """
-    mkdir_p takes a string path and creates a directory at this path if it
-    does not already exist.
-    """
-    try:
-        os.makedirs(path)
-    except OSError as exc:
-        if exc.errno == errno.EEXIST and os.path.isdir(path):
-            pass
-        else:
-            raise
-
-
 # commandline arguments
 # -----
 
@@ -102,6 +82,28 @@ parser.add_argument(
      default=20,
      help='memory to be reserved (GB)')
 args = parser.parse_args()
+
+
+# custom functions
+# -----
+from config import get_par, get_aux
+
+
+def mkdir_p(path):
+    """
+    mkdir_p takes a string path and creates a directory at this path if it
+    does not already exist.
+    """
+    try:
+        os.makedirs(path)
+    except OSError as exc:
+        if exc.errno == errno.EEXIST and os.path.isdir(path):
+            pass
+        else:
+            raise
+
+
+
 
 
 class SbatchDocument(object):
