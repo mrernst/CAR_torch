@@ -150,10 +150,9 @@ def make_cmap(colors, position=None, bit=False):
 
 def saliencymap_to_figure(smap, pic, alpha=0.5):
     """
-    saliencymap_to_tfsummary takes a saliency map smap, a picture pic and an
-    optional value for alpha and returns a tf summary containing the picture
-    overlayed with the saliency map with transparency alpha.
-    Add tfplot.figure.to_summary(fig, tag=tag) to plot to summary
+    saliencymap_to_figure takes a saliency map smap, a picture pic and an
+    optional value for alpha and returns a matplotlib figure containing the 
+    picture overlayed with the saliency map with transparency alpha.
     """
     number_of_maps_per_axis = int(np.floor(np.sqrt(smap.shape[0])))
     fig = mpl.figure.Figure(figsize=(
@@ -384,6 +383,24 @@ def save_sprite_image(savedir, raw_images):
     else:
         plt.imsave(savedir, sprite_image.astype(np.uint8))
 
+
+# -----------------
+# tensorboard specific
+# -----------------
+
+def add_pr_curve_tensorboard(class_enc, class_index, test_probs, test_preds, writer, global_step=0):
+    '''
+    Takes in a "class_index" from 0 to 9 and plots the corresponding
+    precision-recall curve
+    '''
+    tensorboard_preds = test_preds == class_index
+    tensorboard_probs = test_probs[:, class_index]
+
+    writer.add_pr_curve(class_enc[class_index],
+                        tensorboard_preds,
+                        tensorboard_probs,
+                        global_step=global_step)
+    writer.close()
 
 # _____________________________________________________________________________
 

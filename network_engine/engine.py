@@ -343,6 +343,8 @@ def test_recurrent(test_loader, network, criterion, epoch):
     accuracy = 0
     confusion_matrix = torch.zeros(
         CONFIG['classes'], CONFIG['classes'], dtype=torch.int64)
+    class_probs = []
+    class_preds = []
 
     # TODO: Solve the unroll-timestep handling as a function parameter
     timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
@@ -363,14 +365,27 @@ def test_recurrent(test_loader, network, criterion, epoch):
             accuracy += (topi == classes.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
             
+            
             # confusion matrix construction
             oh_labels = F.one_hot(classes, CONFIG['classes'])
             oh_outputs = F.one_hot(topi, CONFIG['classes']).view(-1,CONFIG['classes'])
             confusion_matrix += torch.matmul(torch.transpose(oh_labels, 0, 1), oh_outputs)
+            
+            # pr curve construction
+            class_probs_batch = [F.softmax(el, dim=0) for el in outputs]
+            class_preds_batch = topi
+            
+            class_probs.append(class_probs_batch)
+            class_preds.append(class_preds_batch)
+            
+    # pr-curves
+    test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, CONFIG['classes'])
+    test_preds = torch.cat(class_preds).view(-1)
+    print(test_probs.shape, test_preds.shape)
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
-    return loss /(i+1), accuracy/(i+1), confusion_matrix
+    return loss /(i+1), accuracy/(i+1), confusion_matrix, test_probs, test_preds
 
 
 def evaluate_recurrent(test_loader, network, criterion, epoch):
@@ -394,13 +409,16 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary, cm = test_recurrent(test_loader, network, criterion, epoch)
+            test_loss, test_accurary, cm, test_probs, test_preds = test_recurrent(test_loader, network, criterion, epoch)
             cm_figure = visualizer.cm_to_figure(cm, CONFIG['class_encoding'])
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
             writer.add_scalar(
                 'testing/accuracy', test_accurary, epoch * len_of_data)
             writer.add_figure('testing/confusionmatrix', cm_figure, global_step=epoch * len_of_data, close=True, walltime=None)
+            for i in range(CONFIG['classes']):
+                visualizer.add_pr_curve_tensorboard(CONFIG['class_encoding'], i, test_probs, test_preds, writer, global_step=epoch * len_of_data)
+            writer.close()
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
@@ -438,10 +456,13 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                       epoch * len_of_data + i_batch)
                 writer.add_scalar(
                     'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
-            
+                writer.close()
                 
+            
         if epoch % save_every == 0:
                 checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
+    
+    writer.close()
 
 
 # -----------------
