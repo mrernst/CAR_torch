@@ -277,58 +277,20 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.step()
 
     # update the hopfield networks for B-H
-    network.hnet1.covariance_update(network.act1)
-    network.hnet2.covariance_update(network.act2)
+    # network.hnet1.covariance_update(network.act1)
+    # network.hnet2.covariance_update(network.act2)
     # look at the patterns that the network stores..
     # think of Hnet as clustering algorithm
 
     loss = loss / topi.shape[0]  # average loss per item
     return loss.item(), accuracy.item()
 
-def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
-
-    optimizer.zero_grad()
-    input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
-    loss = 0
-    # TODO: Solve the timestep handling as a function parameter
-    timesteps = CONFIG['time_depth'] + 1
-    input_tensor = input_tensor.unsqueeze(1)
-    input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
-    network_output = network(input_tensor)
-
-    for t in range(network_output.shape[1]):
-        loss += criterion(network_output[:,t,:], target_tensor)
-
-    topv, topi = network_output[:,t,:].topk(1)
-    accuracy = (topi == target_tensor.unsqueeze(1)).sum(
-        dim=0, dtype=torch.float64) / topi.shape[0]
-
-    loss.backward()
-    optimizer.step()
-    loss = loss / topi.shape[0]  # average loss per item
-    return loss.item(), accuracy.item()
 
 def test(test_loader, network, criterion, epoch):
     loss = 0
     accuracy = 0
     confusion_matrix = torch.zeros(
         CONFIG['classes'], CONFIG['classes'], dtype=torch.int64)
-    
-    # with torch.no_grad():
-    #     for i, (inputs, classes) in enumerate(dataloaders['val']):
-    #         inputs = inputs.to(device)
-    #         classes = classes.to(device)
-    #         outputs = model_ft(inputs)
-    #         _, preds = torch.max(outputs, 1)
-    #         for t, p in zip(classes.view(-1), preds.view(-1)):
-    #                 confusion_matrix[t.long(), p.long()] += 1
-    # 
-    # print(confusion_matrix)
-    # update_confusion_matrix = tf.assign_add(
-    # self.total, tf.matmul(tf.transpose(
-    #     tf.one_hot(tf.argmax(
-    #         network.outputs[time_depth], 1), classes)),
-    #     labels.outputs[time_depth]))
 
     with torch.no_grad():
         for i, data in enumerate(test_loader):
@@ -351,6 +313,31 @@ def test(test_loader, network, criterion, epoch):
     
     return loss /(i+1), accuracy/(i+1), confusion_matrix
 
+
+def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
+    
+    optimizer.zero_grad()
+    input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
+    loss = 0
+    # TODO: Solve the timestep handling as a function parameter
+    timesteps = CONFIG['time_depth'] + 1
+    input_tensor = input_tensor.unsqueeze(1)
+    input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
+    network_output = network(input_tensor)
+    
+    for t in range(network_output.shape[1]):
+        loss += criterion(network_output[:,t,:], target_tensor)
+        
+        topv, topi = network_output[:,t,:].topk(1)
+        accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+            dim=0, dtype=torch.float64) / topi.shape[0]
+            
+        loss.backward()
+        optimizer.step()
+        loss = loss / topi.shape[0]  # average loss per item
+        return loss.item(), accuracy.item()
+            
+
 def test_recurrent(test_loader, network, criterion, epoch):
     loss = 0
     accuracy = 0
@@ -359,22 +346,27 @@ def test_recurrent(test_loader, network, criterion, epoch):
 
     # TODO: Solve the unroll-timestep handling as a function parameter
     timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
+    
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            input_tensor, target_tensor = data
-            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
-            input_tensor = input_tensor.unsqueeze(1)
-            input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
-            network_output = network(input_tensor)
-            for t in range(network_output.shape[1]):
-                loss += criterion(network_output[:,t,:], target_tensor)
+            inputs, classes = data
+            inputs, classes = inputs.to(device), classes.to(device)
+            inputs = inputs.unsqueeze(1)
+            inputs = inputs.repeat(1, timesteps, 1, 1, 1)
+            
+            outputs = network(inputs)
+            for t in range(outputs.shape[1]):
+                loss += criterion(outputs[:,t,:], classes)
             loss /= test_loader.batch_size
-            topv, topi = network_output[:,t,:].topk(1)
-            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
+            # outputs at other timesteps?
+            topv, topi = outputs[:,t,:].topk(1)
+            accuracy += (topi == classes.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
             
             # confusion matrix construction
-            # TODO: implement confusion_matrix
+            oh_labels = F.one_hot(classes, CONFIG['classes'])
+            oh_outputs = F.one_hot(topi, CONFIG['classes']).view(-1,CONFIG['classes'])
+            confusion_matrix += torch.matmul(torch.transpose(oh_labels, 0, 1), oh_outputs)
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
@@ -402,7 +394,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary, cm = test(test_loader, network, criterion, epoch)
+            test_loss, test_accurary, cm = test_recurrent(test_loader, network, criterion, epoch)
             cm_figure = visualizer.cm_to_figure(cm, CONFIG['class_encoding'])
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
@@ -412,7 +404,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train(sample_batched[0], sample_batched[1],
+            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
@@ -458,8 +450,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 
 # Training network
 # network = B_Network().to(device)
-network = BH_Network().to(device)
-# network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=64).to(device)
+#network = BH_Network().to(device)
+network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=32).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
