@@ -44,14 +44,11 @@
 
 # standard libraries
 # -----
-# import tensorflow as tf
-import tensorflow.compat.v1 as tf
-tf.disable_eager_execution()
 import numpy as np
+
 from PIL import Image
 from textwrap import wrap
 import matplotlib as mpl
-import tfplot
 import re
 import itertools
 from math import sqrt
@@ -147,12 +144,6 @@ def make_cmap(colors, position=None, bit=False):
     return cmap
 
 
-# ------------------
-# plot to tf.summary
-# ------------------
-
-# TODO: Add support for plotting barplots and learningcurves and put barplot
-# into tf-summary
 
 # saliency maps or class activation mapping
 # -----
@@ -342,76 +333,7 @@ class MidPointNorm(mpl.colors.Normalize):
 # activations and filters
 # -----------------------
 
-
-def put_kernels_on_grid(name, kernel, pad=1):
-    """
-    Visualize conv. filters as an image (mostly useful for the 1st layer).
-    Arranges filters into a grid, with some paddings between adjacent filters.
-
-    Args:
-      kernel:            tensor of shape [Y, X, NumChannels, NumKernels]
-      pad:               number of black pixels around each filter
-                         (between them)
-
-    Returns:
-      Tensor of shape [1, (Y+2*pad)*grid_Y, (X+2*pad)*grid_X, NumChannels].
-    """
-    # get shape of the grid. NumKernels == grid_Y * grid_X
-    def factorization(n):
-        for i in range(int(sqrt(float(n))), 0, -1):
-            if n % i == 0:
-                if i == 1:
-                    print('Who would enter a prime number of filters')
-                return (i, int(n / i))
-    (grid_Y, grid_X) = factorization(kernel.get_shape()[3].value)
-    print('[Visualization] {} grid: {} = ({}, {})'.format(
-        name, kernel.get_shape()[3].value, grid_Y, grid_X))
-
-    x_min = tf.reduce_min(kernel)
-    x_max = tf.reduce_max(kernel)
-    kernel = (kernel - x_min) / (x_max - x_min)
-
-    # pad X and Y
-    x = tf.pad(kernel, tf.constant(
-        [[pad, pad], [pad, pad], [0, 0], [0, 0]]), mode='CONSTANT')
-
-    # X and Y dimensions, w.r.t. padding
-    Y = kernel.get_shape()[0] + 2 * pad
-    X = kernel.get_shape()[1] + 2 * pad
-
-    channels = kernel.get_shape()[2]
-
-    # put NumKernels to the 1st dimension
-    x = tf.transpose(x, (3, 0, 1, 2))
-    # organize grid on Y axis
-    x = tf.reshape(x, tf.stack([grid_X, Y * grid_Y, X, channels]))
-
-    # switch X and Y axes
-    x = tf.transpose(x, (0, 2, 1, 3))
-    # organize grid on X axis
-    x = tf.reshape(x, tf.stack([1, X * grid_X, Y * grid_Y, channels]))
-
-    # back to normal order (not combining with the next step for clarity)
-    x = tf.transpose(x, (2, 1, 3, 0))
-
-    # to tf.image_summary order [batch_size, height, width, channels],
-    #   where in this case batch_size == 1
-    x = tf.transpose(x, (3, 0, 1, 2))
-
-    # scaling to [0, 255] is not necessary for tensorboard
-    return x
-
-
-def put_activations_on_grid(name, V, pad=1):
-    """
-    Use put_kernels_on_grid to visualize activations. put_activations_on_grid
-    slices the activation tensors into a format that put_kernels_on_grid can
-    read.
-    """
-    V = tf.slice(V, (0, 0, 0, 0), (1, -1, -1, -1))  # V[0,...]
-    V = tf.transpose(V, (1, 2, 0, 3))
-    return put_kernels_on_grid(name, V, pad)
-
+# TODO add functions to visualize activations and filters
 
 # -----------------------------
 # sprite images for tensorboard

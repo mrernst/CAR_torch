@@ -355,7 +355,7 @@ def test_recurrent(test_loader, network, criterion, epoch):
     loss = 0
     accuracy = 0
     confusion_matrix = torch.zeros(
-        CONFIG['classes'], CONFIG['classes'], dtype=torch.int64
+        CONFIG['classes'], CONFIG['classes'], dtype=torch.int64)
 
     # TODO: Solve the unroll-timestep handling as a function parameter
     timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
@@ -403,8 +403,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
             test_loss, test_accurary, cm = test(test_loader, network, criterion, epoch)
-            # TODO: helper function to construct cm figure
-            # cm_figure = visualizer.cm_to_figure(cm)
+            cm_figure = visualizer.cm_to_figure(cm, CONFIG['class_encoding'])
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
             writer.add_scalar(
