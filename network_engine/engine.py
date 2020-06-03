@@ -66,6 +66,7 @@ import math
 # custom functions
 # -----
 import utilities.helper as helper
+import utilities.visualizer as visualizer
 from utilities.networks.buildingblocks.hopfield import HopfieldNet
 from utilities.networks.buildingblocks.rcnn import RecConvNet, B_Network
 
@@ -108,7 +109,7 @@ def matplotlib_imshow(img, one_channel=False, cmap='Greys'):
 
 def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
     model_out_path = experiment_dir + "model_epoch_{}.pth".format(epoch)
-    torch.save(model, model_out_path)
+    torch.save(model.state_dict(), model_out_path)
     print("[Info:] Checkpoint saved to {}".format(model_out_path, end='\n'))
     if (epoch > 0 and remove_last):
         os.remove(experiment_dir +
@@ -310,27 +311,53 @@ def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
 def test(test_loader, network, criterion, epoch):
     loss = 0
     accuracy = 0
+    confusion_matrix = torch.zeros(
+        CONFIG['classes'], CONFIG['classes'], dtype=torch.int64)
+    
+    # with torch.no_grad():
+    #     for i, (inputs, classes) in enumerate(dataloaders['val']):
+    #         inputs = inputs.to(device)
+    #         classes = classes.to(device)
+    #         outputs = model_ft(inputs)
+    #         _, preds = torch.max(outputs, 1)
+    #         for t, p in zip(classes.view(-1), preds.view(-1)):
+    #                 confusion_matrix[t.long(), p.long()] += 1
+    # 
+    # print(confusion_matrix)
+    # update_confusion_matrix = tf.assign_add(
+    # self.total, tf.matmul(tf.transpose(
+    #     tf.one_hot(tf.argmax(
+    #         network.outputs[time_depth], 1), classes)),
+    #     labels.outputs[time_depth]))
+
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            input_tensor, target_tensor = data
-            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
-            network_output = network(input_tensor)
-            loss += criterion(network_output, target_tensor) / \
+            inputs, classes = data
+            inputs, classes = inputs.to(device), classes.to(device)
+            outputs = network(inputs)
+            loss += criterion(outputs, classes) / \
                 test_loader.batch_size
-            topv, topi = network_output.topk(1)
-            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
+            topv, topi = outputs.topk(1)
+            accuracy += (topi == classes.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
-
+            
+            # confusion matrix construction
+            oh_labels = F.one_hot(classes, CONFIG['classes'])
+            oh_outputs = F.one_hot(topi, CONFIG['classes']).view(-1,CONFIG['classes'])
+            confusion_matrix += torch.matmul(torch.transpose(oh_labels, 0, 1), oh_outputs)
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                            loss /(i+1), accuracy/(i+1)), end="\n")
     
     
-    return loss /(i+1), accuracy/(i+1)
+    return loss /(i+1), accuracy/(i+1), confusion_matrix
 
 def test_recurrent(test_loader, network, criterion, epoch):
     loss = 0
     accuracy = 0
-    # TODO: Solve the timestep handling as a function parameter
+    confusion_matrix = torch.zeros(
+        CONFIG['classes'], CONFIG['classes'], dtype=torch.int64
+
+    # TODO: Solve the unroll-timestep handling as a function parameter
     timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
     with torch.no_grad():
         for i, data in enumerate(test_loader):
@@ -345,10 +372,13 @@ def test_recurrent(test_loader, network, criterion, epoch):
             topv, topi = network_output[:,t,:].topk(1)
             accuracy += (topi == target_tensor.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
+            
+            # confusion matrix construction
+            # TODO: implement confusion_matrix
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
-    return loss /(i+1), accuracy/(i+1)
+    return loss /(i+1), accuracy/(i+1), confusion_matrix
 
 
 def evaluate_recurrent(test_loader, network, criterion, epoch):
@@ -372,16 +402,15 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test(test_loader, network, criterion,
-                                            epoch)
+            test_loss, test_accurary, cm = test(test_loader, network, criterion, epoch)
+            # TODO: helper function to construct cm figure
+            # cm_figure = visualizer.cm_to_figure(cm)
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
             writer.add_scalar(
                 'testing/accuracy', test_accurary, epoch * len_of_data)
+            writer.add_figure('testing/confusionmatrix', cm_figure, global_step=epoch * len_of_data, close=True, walltime=None)
         start = time.time()
-        # TODO: Recheck the writing of accuracy and error
-        # maybe don't bother with averaging, just write down every 'print_every' steps
-        # rewrite the write down and evaluation.
         for i_batch, sample_batched in enumerate(train_loader):
 
             loss, accuracy = train(sample_batched[0], sample_batched[1],
@@ -450,16 +479,6 @@ test_dataset = ImageFolderLMDB(
     transforms.Normalize((0.,), (1.,))
 ]))
 
-# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/', train=True, download=True, transform=transforms.Compose([
-#        transforms.ToTensor(),
-#        transforms.Normalize((0.,), (1.,))
-#    ]))
-# 
-# test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO', train=False, transform=transforms.Compose([
-#        transforms.ToTensor(),
-#        transforms.Normalize((0.,), (1.,))
-#    ]))
-
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
@@ -476,12 +495,21 @@ trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
 
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
-# TODO: Better Checkpointing
+# TODO: Better Checkpointing and saving
 
 
 
 # _____________________________________________________________________________
 
+# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/', train=True, download=True, transform=transforms.Compose([
+    #        transforms.ToTensor(),
+    #        transforms.Normalize((0.,), (1.,))
+    #    ]))
+    # 
+    # test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO', train=False, transform=transforms.Compose([
+        #        transforms.ToTensor(),
+        #        transforms.Normalize((0.,), (1.,))
+        #    ]))
 
 # -----------------
 # top-level comment
