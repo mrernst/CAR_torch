@@ -101,15 +101,23 @@ def print_misclassified_objects(cm, encoding, n_obj=5):
     pass
 
 
-def print_tensor_info(tensor, name=None):
+def print_tensor_info(tensor, name=None, writer=None):
     """
     Takes a torch.tensor and returns name and shape for debugging purposes
     """
-    name = name if name else tensor.names
-    text = "[DEBUG] name = {}, shape = {}, dtype = {}, device = {} \n" + \
+
+    if writer:
+        writer.add_scalar(name + '/min', tensor.min())
+        writer.add_scalar(name + '/max', tensor.max())
+        writer.add_scalar(name + '/std', tensor.type(torch.float).std())
+        writer.add_scalar(name + '/mean', tensor.type(torch.float).mean())
+    else:
+        name = name if name else tensor.names
+        text = "[DEBUG] name = {}, shape = {}, dtype = {}, device = {} \n" + \
         "\t min = {}, max = {}, std = {}, mean = {}"
-    print(text.format(name, list(tensor.shape), tensor.dtype, tensor.device.type,
+        print(text.format(name, list(tensor.shape), tensor.dtype, tensor.device.type,
         tensor.min(), tensor.max(), tensor.type(torch.float).std(), tensor.type(torch.float).mean()))
+        
     pass
 
 

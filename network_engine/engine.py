@@ -8,7 +8,7 @@
 #                                             .o888UU[[[/;:-.  .o@P^    MMM^
 # engine.py                                  oN88888UU[[[/;::-.        dP^
 # The main file including                   dNMMNN888UU[[[/;:--.   .o@P^
-# the training loop                       ,MMMMMMN888UU[[/;::-. o@^
+# the training loop                        ,MMMMMMN888UU[[/;::-. o@^
 #                                          NNMMMNN888UU[[[/~.o@P^
 # Markus Ernst                             888888888UU[[[/o@^-..
 #                                         oI8888UU[[[/o@P^:--..
@@ -50,7 +50,7 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
-from torchvision import utils, datasets
+#from torchvision import utils, datasets
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -163,7 +163,6 @@ CONFIG = helper.infer_additional_parameters(
     helper.read_config_file(FLAGS.config_file)
 )
 
-
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
@@ -188,6 +187,7 @@ class BH_Network(nn.Module):
         self.bn2 = nn.BatchNorm2d(32)
         self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
         self.fc1 = nn.Linear(32 * 8 * 8, 10)
+        self.debug_writer = SummaryWriter(CONFIG['output_dir'])
 
     def forward(self, x):
         # layer 1
@@ -208,11 +208,13 @@ class BH_Network(nn.Module):
             y = self.hnet1.step(y)
         y = y.view(b,c,h,w).type(dtype=torch.float32)
         y = y * self.i_factor # y * 2 - 1 * self.i_factor # reshape again
-        helper.print_tensor_info(x, name='x before')
-        helper.print_tensor_info(y, name='y')
         x += y # think of y as a relu and maybe multiplying then makes sense?
+        
+        # DEBUG writedown
+        helper.print_tensor_info(self.bn1.bias, name='1/bn_bias', writer=self.debug_writer)
+        helper.print_tensor_info(x, name='1/x', writer=self.debug_writer)
+        helper.print_tensor_info(y, name='1/y', writer=self.debug_writer)
 
-        helper.print_tensor_info(x, name='x after')
 
         # layer 2
 
@@ -229,6 +231,11 @@ class BH_Network(nn.Module):
         y = y.view(b,c,h,w).type(dtype=torch.float32)
         y = y = y * self.i_factor # y * 2 - 1 * self.i_factor # reshape again
         x += y
+
+        # DEBUG writedown
+        helper.print_tensor_info(self.bn2.bias, name='2/bn_bias', writer=self.debug_writer)
+        helper.print_tensor_info(x, name='2/x', writer=self.debug_writer)
+        helper.print_tensor_info(y, name='2/y', writer=self.debug_writer)
 
         # fc and out
         x = x.view(-1, 32 * 8 * 8)
@@ -269,8 +276,8 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.step()
 
     # update the hopfield networks for B-H
-    # network.hnet1.covariance_update(network.act1)
-    # network.hnet2.covariance_update(network.act2)
+    network.hnet1.covariance_update(network.act1)
+    network.hnet2.covariance_update(network.act2)
     # look at the patterns that the network stores..
     # think of Hnet as clustering algorithm
 
@@ -344,6 +351,12 @@ def test_recurrent(test_loader, network, criterion, epoch):
     return loss /(i+1), accuracy/(i+1)
 
 
+def evaluate_recurrent(test_loader, network, criterion, epoch):
+    #TODO: write a function that evaluates given a test set and
+    # returns loss, accuracy, while writing down several properties, like
+    # softmax output, hidden representation, etc, maybe look at saturn
+    pass
+
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
     plot_losses = []
     print_loss_total = 0
@@ -359,7 +372,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary = test_recurrent(test_loader, network, criterion,
+            test_loss, test_accurary = test(test_loader, network, criterion,
                                             epoch)
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
@@ -371,7 +384,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         # rewrite the write down and evaluation.
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
+            loss, accuracy = train(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
@@ -416,9 +429,9 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # -----------------
 
 # Training network
-#network = B_Network().to(device)
-#network = BH_Network().to(device)
-network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=64).to(device)
+# network = B_Network().to(device)
+network = BH_Network().to(device)
+# network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=64).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
@@ -463,37 +476,9 @@ trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
 
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
-# TODO: Implement general checkpointing in trainEpochs
-
-# _____________________________________________________________________________
-
-# train_dataset = datasets.MNIST(root='../datasets/', train=True, download=True,
-#                    transform=transforms.Compose([
-#                        transforms.ToTensor(),
-#                        transforms.Normalize((0.,), (1.,))
-#                    ]))
-# 
-# test_dataset = datasets.MNIST(root='../datasets/', train=False, transform=transforms.Compose([
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
+# TODO: Better Checkpointing
 
 
-# train_dataset = datasets.ImageFolder(
-#     root='../datasets/dynaMO/data/mnist/train/',
-#     transform=transforms.Compose([
-#     transforms.Grayscale(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
-# 
-# test_dataset = datasets.ImageFolder(
-#     root='../datasets/dynaMO/data/mnist/test/',
-#     transform=transforms.Compose([
-#     transforms.Grayscale(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
 
 # _____________________________________________________________________________
 
