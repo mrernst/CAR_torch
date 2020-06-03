@@ -372,16 +372,14 @@ def test_recurrent(test_loader, network, criterion, epoch):
             confusion_matrix += torch.matmul(torch.transpose(oh_labels, 0, 1), oh_outputs)
             
             # pr curve construction
-            class_probs_batch = [F.softmax(el, dim=0) for el in outputs]
-            class_preds_batch = topi
+            class_probs_batch = [F.softmax(el, dim=1) for el in outputs]
             
             class_probs.append(class_probs_batch)
-            class_preds.append(class_preds_batch)
+            class_preds.append(topi)
             
     # pr-curves
     test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, CONFIG['classes'])
     test_preds = torch.cat(class_preds).view(-1)
-    print(test_probs.shape, test_preds.shape)
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
