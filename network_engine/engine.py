@@ -518,8 +518,6 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['bat
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
 
-# Tensorboard Writer
-
 output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
 loss_writer = SummaryWriter(output_dir)
 
