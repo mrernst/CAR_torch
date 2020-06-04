@@ -50,7 +50,9 @@ import torch.nn as nn
 import torch.nn.functional as F
 from torch import optim
 
-#from torchvision import utils, datasets
+# for MNIST
+from torchvision import utils, datasets
+
 from torch.utils.data import Dataset, DataLoader
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
@@ -277,8 +279,8 @@ def train(input_tensor, target_tensor, network, optimizer, criterion):
     optimizer.step()
 
     # update the hopfield networks for B-H
-    # network.hnet1.covariance_update(network.act1)
-    # network.hnet2.covariance_update(network.act2)
+    network.hnet1.covariance_update(network.act1)
+    network.hnet2.covariance_update(network.act2)
     # look at the patterns that the network stores..
     # think of Hnet as clustering algorithm
 
@@ -291,7 +293,9 @@ def test(test_loader, network, criterion, epoch):
     accuracy = 0
     confusion_matrix = torch.zeros(
         CONFIG['classes'], CONFIG['classes'], dtype=torch.int64)
-
+    class_probs = []
+    class_preds = []
+    
     with torch.no_grad():
         for i, data in enumerate(test_loader):
             inputs, classes = data
@@ -307,11 +311,21 @@ def test(test_loader, network, criterion, epoch):
             oh_labels = F.one_hot(classes, CONFIG['classes'])
             oh_outputs = F.one_hot(topi, CONFIG['classes']).view(-1,CONFIG['classes'])
             confusion_matrix += torch.matmul(torch.transpose(oh_labels, 0, 1), oh_outputs)
+            
+            # pr curve construction
+            class_probs_batch = [F.softmax(el, dim=0) for el in outputs]
+            
+            class_probs.append(class_probs_batch)
+            class_preds.append(topi)
+            
+    # pr-curves
+    test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, CONFIG['classes'])
+    test_preds = torch.cat(class_preds).view(-1)
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                            loss /(i+1), accuracy/(i+1)), end="\n")
     
     
-    return loss /(i+1), accuracy/(i+1), confusion_matrix
+    return loss /(i+1), accuracy/(i+1), confusion_matrix, test_probs, test_preds
 
 
 def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
@@ -407,7 +421,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary, cm, test_probs, test_preds = test_recurrent(test_loader, network, criterion, epoch)
+            test_loss, test_accurary, cm, test_probs, test_preds = test(test_loader, network, criterion, epoch)
             cm_figure = visualizer.cm_to_figure(cm, CONFIG['class_encoding'])
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
@@ -420,7 +434,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
 
-            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
+            loss, accuracy = train(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
             print_loss_total += loss
@@ -469,8 +483,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 
 # Training network
 # network = B_Network().to(device)
-#network = BH_Network().to(device)
-network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=32).to(device)
+network = BH_Network().to(device)
+# network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=32).to(device)
 
 # Datasets
 train_dataset = ImageFolderLMDB(
@@ -489,6 +503,16 @@ test_dataset = ImageFolderLMDB(
     transforms.Normalize((0.,), (1.,))
 ]))
 
+# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
+#            transforms.ToTensor(),
+#            transforms.Normalize((0.,), (1.,))
+#        ]))
+#     
+# test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
+#            transforms.ToTensor(),
+#            transforms.Normalize((0.,), (1.,))
+#        ]))
+
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
@@ -505,21 +529,12 @@ trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
 
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
-# TODO: Better Checkpointing and saving
 
 
 
 # _____________________________________________________________________________
 
-# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/', train=True, download=True, transform=transforms.Compose([
-    #        transforms.ToTensor(),
-    #        transforms.Normalize((0.,), (1.,))
-    #    ]))
-    # 
-    # test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO', train=False, transform=transforms.Compose([
-        #        transforms.ToTensor(),
-        #        transforms.Normalize((0.,), (1.,))
-        #    ]))
+
 
 # -----------------
 # top-level comment
