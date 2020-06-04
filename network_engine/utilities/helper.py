@@ -107,10 +107,10 @@ def print_tensor_info(tensor, name=None, writer=None):
     """
 
     if writer:
-        writer.add_scalar(name + '/min', tensor.min())
-        writer.add_scalar(name + '/max', tensor.max())
-        writer.add_scalar(name + '/std', tensor.type(torch.float).std())
-        writer.add_scalar(name + '/mean', tensor.type(torch.float).mean())
+        writer.add_scalar(name + '/min', tensor.min(), global_step=global_step)
+        writer.add_scalar(name + '/max', tensor.max(), global_step=global_step)
+        writer.add_scalar(name + '/std', tensor.type(torch.float).std(), global_step=global_step)
+        writer.add_scalar(name + '/mean', tensor.type(torch.float).mean(), global_step=global_step)
     else:
         name = name if name else tensor.names
         text = "[DEBUG] name = {}, shape = {}, dtype = {}, device = {} \n" + \
