@@ -139,7 +139,13 @@ class dynaMOSample(object):
         pass
     
     def save_sequence_state_to_image(self, filename, format):
+        "Generate a single image from a sequence state"
         io.imsave('{}.{}'.format(filename, format), self.sequence_state)
+        pass
+    
+    def save_sequence_state_to_images(self, filename, format):
+        "Generate multiple images from a sequence state"
+        # TODO: implement this function
         pass
 
     def get_zoom(self, z_tar, true_size = .6):
@@ -338,6 +344,11 @@ class dynaMOBuilder(object):
             threadlist[t].start()
         for t in range(self.n_threads):
             threadlist[t].join()
+    
+    def generate_db_metadata(filename):
+        # TODO: implement this function
+        csv_file = 0
+        return csv_file
 
 
 
@@ -407,5 +418,7 @@ if __name__ == "__main__":
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='train', output_format=args.outputformat,
             dpath='./data/{}'.format(args.name))
+        # b.generate_metadata(dpath='./data/{}.format(args.name)')
         b.build(target='test', output_format=args.outputformat,
             dpath='./data/{}'.format(args.name))
+        # b.generate_metadata(dpath='./data/{}.format(args.name)')
