@@ -66,6 +66,10 @@ parser.add_argument('--zoom', dest='zoom', action='store_true')
 parser.add_argument('--no-zoom', dest='zoom', action='store_false')
 parser.set_defaults(zoom=True)
 
+parser.add_argument('--strips', dest='strips', action='store_true')
+parser.add_argument('--no-strips', dest='strips', action='store_false')
+parser.set_defaults(strips=True)
+
 parser.add_argument('--interactive', dest='interactive', action='store_true')
 parser.add_argument('--no-interactive', dest='interactive', action='store_false')
 parser.set_defaults(interactive=False)
@@ -145,7 +149,16 @@ class dynaMOSample(object):
     
     def save_sequence_state_to_images(self, filename, format):
         "Generate multiple images from a sequence state"
-        # TODO: implement this function
+        # fix filename
+        filename_new = filename.rsplit('_',2)[0] + 't0_' + filename.rsplit('_',2)[1] + \
+            '_' + filename.rsplit('_',2)[2] 
+        state = self.sequence_state[:,:self.state.shape[0]]
+        io.imsave('{}.{}'.format(filename_new, format), state)
+        for i in range(len(self.movement[0])):
+            filename_new =  filename.rsplit('_',2)[0] + 't{}_'.format(i) + filename.rsplit('_',2)[1] + \
+            '_' + filename.rsplit('_',2)[2] 
+            state = self.sequence_state[:,(i+1)*self.state.shape[0]:(i+2)*self.state.shape[0]]
+            io.imsave('{}.{}'.format(filename_new,  format), state)
         pass
 
     def get_zoom(self, z_tar, true_size = .6):
@@ -272,7 +285,7 @@ class dynaMOBuilder(object):
                     ks = np.random.choice(data.shape[0], self.n_proliferation)
 
                 for p in range(self.n_proliferation):
-                    choice = [i, js[p], ks[p]]
+                    choice = [ks[p], js[p], i]
                     tars = data[choice].reshape([-1, 28, 28])
                     labs = labels[choice]
                     cam_x_pos, cam_y_pos = 0, 0
@@ -282,10 +295,14 @@ class dynaMOBuilder(object):
                     sample = dynaMOSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = self.dpath + '/{}/{}/t{}i{}_{}{}{}'.format(self.target, sample.labels[-1], thread_number, p + i*self.n_proliferation, sample.labels[0], sample.labels[1], sample.labels[2])
+                    filename = self.dpath + '/{}/{}/d{}p{}_{}{}{}_{}i{}'.format(self.target, sample.labels[-1], i, p, sample.labels[0], sample.labels[1], sample.labels[2], thread_number, p + i*self.n_proliferation)
+                    print(filename)
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
-                    sample.save_sequence_state_to_image(filename, output_format)
+                    if args.strips:
+                        sample.save_sequence_state_to_image(filename, output_format)
+                    else:
+                        sample.save_sequence_state_to_images(filename, output_format)
                     #print(" " * 80 + "\r" +
                     #    '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
                     if (p+1 + i*self.n_proliferation)%100 == 0:
@@ -322,7 +339,7 @@ class dynaMOBuilder(object):
             print("ID of process running task {}: {}".format(thread_number, os.getpid()))
 
             for i, mnist_image in enumerate(data):
-                filename = self.dpath + '/{}/{}/t{}i{}_{}'.format(self.target, labels[i], thread_number, i, labels[i])
+                filename = self.dpath + '/{}/{}/{}_{}i{}'.format(self.target, labels[i],labels[i], thread_number, i)
                 mkdir_p(filename.rsplit('/', 1)[0])
                 io.imsave('{}.{}'.format(filename, output_format), mnist_image.reshape([28,28]))
                 if (i)%100 == 0:
@@ -345,10 +362,25 @@ class dynaMOBuilder(object):
         for t in range(self.n_threads):
             threadlist[t].join()
     
-    def generate_db_metadata(filename):
-        # TODO: implement this function
-        csv_file = 0
-        return csv_file
+    def generate_metadata(self, dpath):
+        import csv
+        with open(os.path.join(dpath, 'metadata.csv'), 'w', newline='') as csvfile:
+            writer = csv.writer(csvfile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            classlist = os.listdir(dpath)
+            classlist.remove('metadata.csv')
+            try:
+                classlist.remove('.DS_Store')  # macOS Finder metadata
+            except(ValueError):
+                pass
+            for classname in classlist:
+                filelist = os.listdir(os.path.join(dpath, classname))
+                try:
+                    filelist.remove('.DS_Store')
+                except(ValueError):
+                    pass
+                for filename in filelist:
+                    writer.writerow(['./'+ '{}/'.format(classname) + filename])
+        pass
 
 
 
@@ -418,7 +450,7 @@ if __name__ == "__main__":
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='train', output_format=args.outputformat,
             dpath='./data/{}'.format(args.name))
-        # b.generate_metadata(dpath='./data/{}.format(args.name)')
+        b.generate_metadata(dpath='./data/{}/train/'.format(args.name))
         b.build(target='test', output_format=args.outputformat,
             dpath='./data/{}'.format(args.name))
-        # b.generate_metadata(dpath='./data/{}.format(args.name)')
+        b.generate_metadata(dpath='./data/{}/test/'.format(args.name))
