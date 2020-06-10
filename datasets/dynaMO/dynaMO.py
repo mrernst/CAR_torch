@@ -264,10 +264,9 @@ class dynaMOBuilder(object):
         self.dpath = dpath
         self.lock = threading.Lock()
             
-        def work(data, labels, thread_number):
+        def work(data, labels, thread_number, starting_idx):
             print("Task {} assigned to thread: {}".format(thread_number, threading.current_thread().name))
             print("ID of process running task {}: {}".format(thread_number, os.getpid()))
-
             for i, mnist_image in enumerate(data):
                 if not self.class_duplicates:
                     ks = []
@@ -295,7 +294,7 @@ class dynaMOBuilder(object):
                     sample = dynaMOSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = self.dpath + '/{}/{}/{}_{}_{}{}{}_{}_{}'.format(self.target, sample.labels[-1], i, p, sample.labels[0], sample.labels[1], sample.labels[2], thread_number, p + i*self.n_proliferation)
+                    filename = self.dpath + '/{}/{}/{}_{}_{}{}{}_{}_{}'.format(self.target, sample.labels[-1], starting_idx + i, p, sample.labels[0], sample.labels[1], sample.labels[2], thread_number, p + i*self.n_proliferation)
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
                     if args.strips:
@@ -322,8 +321,8 @@ class dynaMOBuilder(object):
         # establish threads
         threadlist = []
         for t in range(self.n_threads - 1):
-            threadlist.append(threading.Thread(target=work, args=(data[t*datasize_per_thread:(t+1)*datasize_per_thread], labels[t*datasize_per_thread:(t+1)*datasize_per_thread], t), name='t{}'.format(t)))
-        threadlist.append(threading.Thread(target=work, args=(data[(self.n_threads - 1)*datasize_per_thread:], labels[(self.n_threads - 1)*datasize_per_thread:], (self.n_threads - 1)), name='t{}'.format((self.n_threads - 1))))
+            threadlist.append(threading.Thread(target=work, args=(data[t*datasize_per_thread:(t+1)*datasize_per_thread], labels[t*datasize_per_thread:(t+1)*datasize_per_thread], t, t*datasize_per_thread), name='t{}'.format(t)))
+        threadlist.append(threading.Thread(target=work, args=(data[(self.n_threads - 1)*datasize_per_thread:], labels[(self.n_threads - 1)*datasize_per_thread:], (self.n_threads - 1), (self.n_threads - 1)*datasize_per_thread), name='t{}'.format((self.n_threads - 1))))
 
         for t in range(self.n_threads):
             threadlist[t].start()
@@ -359,8 +358,8 @@ class dynaMOBuilder(object):
         # establish threads
         threadlist = []
         for t in range(self.n_threads - 1):
-            threadlist.append(threading.Thread(target=work, args=(data[t*datasize_per_thread:(t+1)*datasize_per_thread], labels[t*datasize_per_thread:(t+1)*datasize_per_thread], t), name='t{}'.format(t)))
-        threadlist.append(threading.Thread(target=work, args=(data[(self.n_threads - 1)*datasize_per_thread:], labels[(self.n_threads - 1)*datasize_per_thread:], (self.n_threads - 1)), name='t{}'.format((self.n_threads - 1))))
+            threadlist.append(threading.Thread(target=work, args=(data[t*datasize_per_thread:(t+1)*datasize_per_thread], labels[t*datasize_per_thread:(t+1)*datasize_per_thread], t, t*datasize_per_thread), name='t{}'.format(t)))
+        threadlist.append(threading.Thread(target=work, args=(data[(self.n_threads - 1)*datasize_per_thread:], labels[(self.n_threads - 1)*datasize_per_thread:], (self.n_threads - 1), (self.n_threads - 1)*datasize_per_thread), name='t{}'.format((self.n_threads - 1))))
 
         for t in range(self.n_threads):
             threadlist[t].start()
