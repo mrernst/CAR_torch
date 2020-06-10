@@ -296,17 +296,22 @@ class dynaMOBuilder(object):
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
                     filename = self.dpath + '/{}/{}/d{}p{}_{}{}{}_{}i{}'.format(self.target, sample.labels[-1], i, p, sample.labels[0], sample.labels[1], sample.labels[2], thread_number, p + i*self.n_proliferation)
-                    print(filename)
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
                     if args.strips:
                         sample.save_sequence_state_to_image(filename, output_format)
+                    # elif args.grids:
+                    #     gridlist.append(sample.sequence_state)
                     else:
                         sample.save_sequence_state_to_images(filename, output_format)
                     #print(" " * 80 + "\r" +
                     #    '[INFO]: Class {}: ({} / {}) \t Total: ({} / {})'.format(sample.labels[-1], p+1, self.n_proliferation, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation),  end="\r")
                     if (p+1 + i*self.n_proliferation)%100 == 0:
                         print("[THREAD {}]: ({} / {}) images done".format(threading.current_thread().name, p+1 + i*self.n_proliferation, data.shape[0]*self.n_proliferation))
+                    # 
+                    # if args.grids:
+                    #     # stack gridlist
+                    #     # save gridlist to file
             return None
 
         if args.testrun:
