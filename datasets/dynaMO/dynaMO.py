@@ -150,12 +150,12 @@ class dynaMOSample(object):
     def save_sequence_state_to_images(self, filename, format):
         "Generate multiple images from a sequence state"
         # fix filename
-        filename_new = filename.rsplit('_',2)[0] + 't0_' + filename.rsplit('_',2)[1] + \
+        filename_new = filename.rsplit('_',2)[0] + '_0_' + filename.rsplit('_',2)[1] + \
             '_' + filename.rsplit('_',2)[2] 
         state = self.sequence_state[:,:self.state.shape[0]]
         io.imsave('{}.{}'.format(filename_new, format), state)
         for i in range(len(self.movement[0])):
-            filename_new =  filename.rsplit('_',2)[0] + 't{}_'.format(i) + filename.rsplit('_',2)[1] + \
+            filename_new =  filename.rsplit('_',2)[0] + '_{}_'.format(i) + filename.rsplit('_',2)[1] + \
             '_' + filename.rsplit('_',2)[2] 
             state = self.sequence_state[:,(i+1)*self.state.shape[0]:(i+2)*self.state.shape[0]]
             io.imsave('{}.{}'.format(filename_new,  format), state)
@@ -295,7 +295,7 @@ class dynaMOBuilder(object):
                     sample = dynaMOSample(tars, labs, [cam_x_pos, cam_y_pos], xyz_tars)
                     typechoice = np.random.choice(['u', 'd', 'l', 'r', 'ur', 'ul', 'dr', 'dl'])
                     _ = sample.generate_movement(self.timesteps, 0.002, typechoice)
-                    filename = self.dpath + '/{}/{}/d{}p{}_{}{}{}_{}i{}'.format(self.target, sample.labels[-1], i, p, sample.labels[0], sample.labels[1], sample.labels[2], thread_number, p + i*self.n_proliferation)
+                    filename = self.dpath + '/{}/{}/{}_{}_{}{}{}_{}_{}'.format(self.target, sample.labels[-1], i, p, sample.labels[0], sample.labels[1], sample.labels[2], thread_number, p + i*self.n_proliferation)
                     mkdir_p(filename.rsplit('/', 1)[0])
                     sample.generate_sequence_state()
                     if args.strips:
