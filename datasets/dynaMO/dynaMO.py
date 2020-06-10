@@ -150,13 +150,13 @@ class dynaMOSample(object):
     def save_sequence_state_to_images(self, filename, format):
         "Generate multiple images from a sequence state"
         # fix filename
-        filename_new = filename.rsplit('_',2)[0] + '_0_' + filename.rsplit('_',2)[1] + \
-            '_' + filename.rsplit('_',2)[2] 
+        filename_new = filename.rsplit('_',3)[0] + '_0_' + filename.rsplit('_',3)[1] + \
+            '_' + filename.rsplit('_',3)[2] + '_' + filename.rsplit('_',3)[3]
         state = self.sequence_state[:,:self.state.shape[0]]
         io.imsave('{}.{}'.format(filename_new, format), state)
         for i in range(len(self.movement[0])):
-            filename_new =  filename.rsplit('_',2)[0] + '_{}_'.format(i) + filename.rsplit('_',2)[1] + \
-            '_' + filename.rsplit('_',2)[2] 
+            filename_new =  filename.rsplit('_',3)[0] + '_{}_'.format(i) + filename.rsplit('_',3)[1] + \
+            '_' + filename.rsplit('_',3)[2] + '_' + filename.rsplit('_',3)[3]
             state = self.sequence_state[:,(i+1)*self.state.shape[0]:(i+2)*self.state.shape[0]]
             io.imsave('{}.{}'.format(filename_new,  format), state)
         pass
@@ -383,7 +383,7 @@ class dynaMOBuilder(object):
                 except(ValueError):
                     pass
                 for filename in filelist:
-                    writer.writerow(['./'+ '{}/'.format(classname) + filename])
+                    writer.writerow(['{}/'.format(classname) + filename])
         pass
 
 
