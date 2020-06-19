@@ -386,7 +386,7 @@ class dynaMOBuilder(object):
                 for filename in filelist:
                     # split filename to get metadata
                     writer.writerow(['{}/'.format(classname) + filename])
-        with zipfile.ZipFile(os.path.join(dpath, 'metadata.csv'), mode='w', compression=zipfile.ZIP_DEFLATED) as zip:
+        with zipfile.ZipFile(os.path.join(dpath, 'metadata.zip'), mode='w', compression=zipfile.ZIP_DEFLATED) as zip:
             zip.write(os.path.join(dpath, 'metadata.csv'))
             zip.close()
         os.remove(os.path.join(dpath, 'metadata.csv'))
