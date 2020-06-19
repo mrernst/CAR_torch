@@ -368,6 +368,7 @@ class dynaMOBuilder(object):
     
     def generate_metadata(self, dpath):
         import csv
+        import zipfile
         with open(os.path.join(dpath, 'metadata.csv'), 'w', newline='') as csvfile:
             writer = csv.writer(csvfile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
             classlist = os.listdir(dpath)
@@ -383,7 +384,12 @@ class dynaMOBuilder(object):
                 except(ValueError):
                     pass
                 for filename in filelist:
+                    # split filename to get metadata
                     writer.writerow(['{}/'.format(classname) + filename])
+        with zipfile.ZipFile(os.path.join(dpath, 'metadata.csv'), mode='w', compression=zipfile.ZIP_DEFLATED) as zip:
+            zip.write(os.path.join(dpath, 'metadata.csv'))
+            zip.close()
+        os.remove(os.path.join(dpath, 'metadata.csv'))
         pass
 
 
