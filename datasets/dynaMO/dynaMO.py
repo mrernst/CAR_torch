@@ -496,7 +496,7 @@ if __name__ == "__main__":
     else:
         data_path = './data/'
         # data_path = '/home/aecgroup/aecdata/contrastive_learning/'
-        
+		
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='train', output_format=args.outputformat,
             dpath=data_path + '{}'.format(args.name))
