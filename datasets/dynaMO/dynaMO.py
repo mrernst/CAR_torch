@@ -134,12 +134,18 @@ class dynaMOSample(object):
         return movement
 
     def generate_sequence_state(self):
+        seq_occlusion_percentage = []
+        seq_occlusion_percentage.append(self.occlusion_percentage)
+        
         seq_state = np.zeros([self.state.shape[0], self.state.shape[1]*(len(self.movement[0])+1)], dtype=np.uint8)
         seq_state[:,:self.state.shape[0]] = self.state
+        
         for i in range(len(self.movement[0])):
             _,_,_ = self.move_camera(self.movement[0][i], self.movement[1][i])
+            seq_occlusion_percentage.append(self.occlusion_percentage)
             seq_state[:,(i+1)*self.state.shape[0]:(i+2)*self.state.shape[0]] = self.state
         self.sequence_state = seq_state
+        self.sequence_occlusion_percentage = seq_occlusion_percentage
         pass
     
     def save_sequence_state_to_image(self, filename, format):
@@ -149,14 +155,16 @@ class dynaMOSample(object):
     
     def save_sequence_state_to_images(self, filename, format):
         "Generate multiple images from a sequence state"
-        # fix filename
+        occlusions = [str(int(np.round(o,2)*100)) for o in self.sequence_occlusion_percentage] 
         filename_new = filename.rsplit('_',3)[0] + '_0_' + filename.rsplit('_',3)[1] + \
-            '_' + filename.rsplit('_',3)[2] + '_' + filename.rsplit('_',3)[3]
+            '_' + occlusions[0] + '_' + filename.rsplit('_',3)[2] + \
+            '_' + filename.rsplit('_',3)[3]
         state = self.sequence_state[:,:self.state.shape[0]]
         io.imsave('{}.{}'.format(filename_new, format), state)
         for i in range(len(self.movement[0])):
-            filename_new =  filename.rsplit('_',3)[0] + '_{}_'.format(i) + filename.rsplit('_',3)[1] + \
-            '_' + filename.rsplit('_',3)[2] + '_' + filename.rsplit('_',3)[3]
+            filename_new =  filename.rsplit('_',3)[0] + '_{}_'.format(i+1) + filename.rsplit('_',3)[1] + \
+            '_' + occlusions[i+1] + '_' + filename.rsplit('_',3)[2] + \
+            '_' + filename.rsplit('_',3)[3]
             state = self.sequence_state[:,(i+1)*self.state.shape[0]:(i+2)*self.state.shape[0]]
             io.imsave('{}.{}'.format(filename_new,  format), state)
         pass
@@ -366,11 +374,42 @@ class dynaMOBuilder(object):
         for t in range(self.n_threads):
             threadlist[t].join()
     
-    def generate_metadata(self, dpath):
+    def generate_metadata(self, dpath):       
+        import pandas as pd
+        df = pd.DataFrame(columns=['relative_file_path', 'digit_id', 'contrast', 'time', 'labels', 'occlusion_percentage', 'thread', 'iteration'])
+        classlist = os.listdir(dpath)
+        try:
+            classlist.remove('.DS_Store')  # macOS Finder metadata
+        except(ValueError):
+            pass
+        for classname in classlist:
+            filelist = os.listdir(os.path.join(dpath, classname))
+            try:
+                filelist.remove('.DS_Store')
+            except(ValueError):
+                pass
+            for filename in filelist:
+                list_of_entries = ['{}/'.format(classname) + filename] + filename.split('.')[0].split('_')
+                
+                df = df.append(
+                    {'relative_file_path':list_of_entries[0],
+                    'digit_id':list_of_entries[1],
+                    'contrast':list_of_entries[2],
+                    'time':list_of_entries[3],
+                    'labels':list_of_entries[4],
+                    'occlusion_percentage':list_of_entries[5],
+                    'thread':list_of_entries[6],
+                    'iteration':list_of_entries[7]}, ignore_index=True)                 
+        
+        df.to_csv(os.path.join(dpath, 'metadata.zip'), index=False)
+        pass
+
+    def generate_metadata_old(self, dpath):
         import csv
-        import zipfile
+        import zipfile        
         with open(os.path.join(dpath, 'metadata.csv'), 'w', newline='') as csvfile:
-            writer = csv.writer(csvfile, delimiter=' ', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            writer = csv.writer(csvfile, delimiter=',', quotechar='|', quoting=csv.QUOTE_MINIMAL)
+            writer.writerow(['relative_file_path', 'digit_id', 'contrast', 'time', 'labels', 'occlusion_percentage', 'thread', 'iteration'])
             classlist = os.listdir(dpath)
             classlist.remove('metadata.csv')
             try:
@@ -384,14 +423,12 @@ class dynaMOBuilder(object):
                 except(ValueError):
                     pass
                 for filename in filelist:
-                    # split filename to get metadata
-                    writer.writerow(['{}/'.format(classname) + filename])
+                    writer.writerow(['{}/'.format(classname) + filename] + filename.split('.')[0].split('_'))
         with zipfile.ZipFile(os.path.join(dpath, 'metadata.zip'), mode='w', compression=zipfile.ZIP_DEFLATED) as zip:
             zip.write(os.path.join(dpath, 'metadata.csv'))
             zip.close()
         os.remove(os.path.join(dpath, 'metadata.csv'))
         pass
-
 
 
 def create_sample_animations(N=10):
