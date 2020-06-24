@@ -494,10 +494,13 @@ if __name__ == "__main__":
             plt.pause(.01)
 
     else:
+        data_path = './data/'
+        # data_path = '/home/aecgroup/aecdata/contrastive_learning/'
+        
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='train', output_format=args.outputformat,
-            dpath='./data/{}'.format(args.name))
-        b.generate_metadata(dpath='./data/{}/train/'.format(args.name))
+            dpath=data_path + '{}'.format(args.name))
+        b.generate_metadata(dpath=data_path + '{}/train/'.format(args.name))
         b.build(target='test', output_format=args.outputformat,
-            dpath='./data/{}'.format(args.name))
-        b.generate_metadata(dpath='./data/{}/test/'.format(args.name))
+            dpath=data_path + '{}'.format(args.name))
+        b.generate_metadata(dpath=data_path + '{}/test/'.format(args.name))
