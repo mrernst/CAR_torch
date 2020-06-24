@@ -404,7 +404,7 @@ class dynaMOBuilder(object):
         df.to_csv(os.path.join(dpath, 'metadata.zip'), index=False)
         pass
 
-    def generate_metadata_old(self, dpath):
+    def generate_metadata_basic(self, dpath):
         import csv
         import zipfile        
         with open(os.path.join(dpath, 'metadata.csv'), 'w', newline='') as csvfile:
@@ -494,13 +494,15 @@ if __name__ == "__main__":
             plt.pause(.01)
 
     else:
-        data_path = './data/'
+        #data_path = './data/'
         # data_path = '/home/aecgroup/aecdata/contrastive_learning/'
+        data_path = '/home/aecgroup/aecdata/Textures/occluded/datasets/'
         
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
-        b.build(target='train', output_format=args.outputformat,
-            dpath=data_path + '{}'.format(args.name))
-        b.generate_metadata(dpath=data_path + '{}/train/'.format(args.name))
         b.build(target='test', output_format=args.outputformat,
             dpath=data_path + '{}'.format(args.name))
-        b.generate_metadata(dpath=data_path + '{}/test/'.format(args.name))
+        b.generate_metadata_basic(dpath=data_path + '{}/test/'.format(args.name))
+        b.build(target='train', output_format=args.outputformat,
+            dpath=data_path + '{}'.format(args.name))
+        b.generate_metadata_basic(dpath=data_path + '{}/train/'.format(args.name))
+
