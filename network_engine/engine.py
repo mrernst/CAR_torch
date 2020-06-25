@@ -327,6 +327,13 @@ def test(test_loader, network, criterion, epoch):
     
     return loss /(i+1), accuracy/(i+1), confusion_matrix, test_probs, test_preds
 
+def train_hopfield_part():
+    # TODO: implement this correctly
+    """
+    separate function to train the hopfield network after one epoch of regular
+    training is done
+    """
+    pass
 
 def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
     
