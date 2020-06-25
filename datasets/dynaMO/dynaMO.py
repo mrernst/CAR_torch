@@ -494,9 +494,9 @@ if __name__ == "__main__":
             plt.pause(.01)
 
     else:
-        #data_path = './data/'
+        data_path = './data/'
         # data_path = '/home/aecgroup/aecdata/contrastive_learning/'
-        data_path = '/home/aecgroup/aecdata/Textures/occluded/datasets/'
+        # data_path = '/home/aecgroup/aecdata/Textures/occluded/datasets/'
         
         b = dynaMOBuilder(class_duplicates=args.classduplicates, timesteps=args.timesteps, n_proliferation=args.nproliferation, n_threads=args.nthreads)
         b.build(target='test', output_format=args.outputformat,
