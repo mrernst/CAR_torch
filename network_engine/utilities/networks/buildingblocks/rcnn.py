@@ -55,6 +55,7 @@ import torch
 # Network Constructor
 # -----------------
 
+# TODO: Implement constructor correctly
 def constructor(name,
                 configuration_dict,
                 is_training,
@@ -134,7 +135,7 @@ class RecConvCell(nn.Module):
 
     def __init__(self, connectivity, input_channels, output_channels, output_channels_above, kernel_size, bias):
         """
-        Initialize ConvLSTM cell.
+        Initialize RecConvCell cell.
 
         Parameters
         ----------
