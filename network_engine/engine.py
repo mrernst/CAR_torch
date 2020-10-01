@@ -117,6 +117,34 @@ def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
         os.remove(experiment_dir +
                   "model_epoch_{}.pth".format(epoch - save_every))
 
+class RandomData(Dataset):
+    
+    def __init__(self, length=45, timesteps=4, constant_over_time=False, transform=None):
+        self.length = length
+        self.timesteps = timesteps
+        self.transform = transform
+        if constant_over_time:
+            input_tensor = torch.randint(255,[length, 1, 32, 32], dtype=torch.float)
+            input_tensor = input_tensor.unsqueeze(1)
+            self.data = input_tensor.repeat(1, timesteps, 1, 1, 1)
+        else:
+            self.data = torch.randint(255,[length, timesteps, 1, 32, 32], dtype=torch.float)
+        self.labels = torch.randint(9, [length], dtype=torch.float)
+        
+    def __len__(self):
+        return self.length
+
+    def __getitem__(self, idx):
+        if torch.is_tensor(idx):
+            idx = idx.tolist()
+
+        image = self.data[idx]
+        label = self.labels[idx]
+        
+        if self.transform:
+            image = self.transform(image)
+
+        return image, label
 
 # cross-platform development
 
@@ -170,7 +198,7 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # -----------------
-# Functions for Training and Evaluation
+# Functions for Training, Testing and Evaluation
 # -----------------
 
 
@@ -233,24 +261,17 @@ def test_recurrent(test_loader, network, criterion, epoch):
             
             # pr curve construction
             class_probs_batch = [F.softmax(el, dim=1) for el in outputs]
-            
             class_probs.append(class_probs_batch)
             class_preds.append(topi)
             
     # pr-curves
-    test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, CONFIG['classes'])
+    test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, t+1, CONFIG['classes'])
     test_preds = torch.cat(class_preds).view(-1)
 
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
     return loss /(i+1), accuracy/(i+1), confusion_matrix, test_probs, test_preds
 
-
-def evaluate_recurrent(test_loader, network, criterion, epoch):
-    #TODO: write a function that evaluates given a test set and
-    # returns loss, accuracy, while writing down several properties, like
-    # softmax output, hidden representation, etc, maybe look at saturn
-    pass
 
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
     plot_losses = []
@@ -275,7 +296,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                 'testing/accuracy', test_accurary, epoch * len_of_data)
             writer.add_figure('testing/confusionmatrix', cm_figure, global_step=epoch * len_of_data, close=True, walltime=None)
             for i in range(CONFIG['classes']):
-                visualizer.add_pr_curve_tensorboard(CONFIG['class_encoding'], i, test_probs, test_preds, writer, global_step=epoch * len_of_data)
+                visualizer.add_pr_curve_tensorboard(CONFIG['class_encoding'], i, test_probs[:,-1,:], test_preds, writer, global_step=epoch * len_of_data)
             writer.close()
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
@@ -331,31 +352,31 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=32).to(device)
 
 # Datasets
-train_dataset = ImageFolderLMDB(
-    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
-    transform=transforms.Compose([
-    transforms.Grayscale(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
+# train_dataset = ImageFolderLMDB(
+#     db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
+#     transform=transforms.Compose([
+#     transforms.Grayscale(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
+# 
+# test_dataset = ImageFolderLMDB(
+#     db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/test.lmdb',
+#     transform=transforms.Compose([
+#     transforms.Grayscale(),
+#     transforms.ToTensor(),
+#     transforms.Normalize((0.,), (1.,))
+# ]))
 
-test_dataset = ImageFolderLMDB(
-    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/test.lmdb',
-    transform=transforms.Compose([
-    transforms.Grayscale(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
-
-# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
-#            transforms.ToTensor(),
-#            transforms.Normalize((0.,), (1.,))
-#        ]))
-#     
-# test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
-#            transforms.ToTensor(),
-#            transforms.Normalize((0.,), (1.,))
-#        ]))
+train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
+           transforms.ToTensor(),
+           transforms.Normalize((0.,), (1.,))
+       ]))
+    
+test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
+           transforms.ToTensor(),
+           transforms.Normalize((0.,), (1.,))
+       ]))
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
@@ -373,6 +394,12 @@ trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
 torch.save(network.state_dict(), checkpoint_dir + 'network.model')
 
 
+# evaluation of network (to be outsourced at some point)
+# -----
+
+# redefine model
+# torch.load model
+# evaluate network
 
 # _____________________________________________________________________________
 
