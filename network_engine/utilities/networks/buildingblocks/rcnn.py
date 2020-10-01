@@ -389,7 +389,7 @@ class RecConvNet(nn.Module):
         output_list = []
         for t in range(seq_len):
             input = x[:, t, :, :, :].view(x.shape[0], self.n_features * 8 * 8) #8, 8 for osmnist
-            output_list.append(F.softmax(self.fc(input), 1))
+            output_list.append(self.fc(input))
         x = torch.stack(output_list, dim=1)
         return x
 
@@ -417,7 +417,7 @@ class B_Network(nn.Module):
         x = x.view(-1, 32 * 8 * 8)
         # print(x.shape)
 
-        x = F.softmax(self.fc1(x), 1)
+        # x = F.softmax(self.fc1(x), 1), softmax is a applied with cross entropy loss!
         # print(x.shape)
 
         return x
@@ -446,7 +446,7 @@ class Lenet5(nn.Module):
         # print(x.shape)
 
         x = F.relu(self.fc1(x))
-        x = F.softmax(self.fc2(x), 1)
+        # x = F.softmax(self.fc2(x), 1) softmax is a applied with cross entropy loss!
         # print(x.shape)
 
         return x
