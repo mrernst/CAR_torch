@@ -167,6 +167,7 @@ CONFIG = helper.infer_additional_parameters(
 device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
+
 # -----------------
 # Encoder and Decoder Classes of the network
 # -----------------
@@ -188,6 +189,7 @@ class BH_Network(nn.Module):
         self.bn2 = nn.BatchNorm2d(32)
         self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
         self.fc1 = nn.Linear(32 * 8 * 8, 10)
+        self.debug_writer = SummaryWriter(CONFIG['output_dir'])
 
     def forward(self, x):
         # layer 1
@@ -208,11 +210,13 @@ class BH_Network(nn.Module):
             y = self.hnet1.step(y)
         y = y.view(b,c,h,w).type(dtype=torch.float32)
         y = y * self.i_factor # y * 2 - 1 * self.i_factor # reshape again
-        helper.print_tensor_info(x, name='x before')
-        helper.print_tensor_info(y, name='y')
         x += y # think of y as a relu and maybe multiplying then makes sense?
+        
+        # DEBUG writedown
+        helper.print_tensor_info(self.bn1.bias, name='1/bn_bias', writer=self.debug_writer)
+        helper.print_tensor_info(x, name='1/x', writer=self.debug_writer)
+        helper.print_tensor_info(y, name='1/y', writer=self.debug_writer)
 
-        helper.print_tensor_info(x, name='x after')
 
         # layer 2
 
@@ -230,6 +234,11 @@ class BH_Network(nn.Module):
         y = y = y * self.i_factor # y * 2 - 1 * self.i_factor # reshape again
         x += y
 
+        # DEBUG writedown
+        helper.print_tensor_info(self.bn2.bias, name='2/bn_bias', writer=self.debug_writer)
+        helper.print_tensor_info(x, name='2/x', writer=self.debug_writer)
+        helper.print_tensor_info(y, name='2/y', writer=self.debug_writer)
+
         # fc and out
         x = x.view(-1, 32 * 8 * 8)
         x = F.softmax(self.fc1(x), 1)
@@ -243,6 +252,80 @@ class BLH_Network(nn.Module):
 
     def forward(self, x):
         return x
+
+
+
+# 
+# class BH_Network(nn.Module):
+#     def __init__(self, i_factor=1, time_steps=2):
+#         super(BH_Network, self).__init__()
+#         self.i_factor = i_factor
+#         self.time_steps = time_steps
+# 
+#         self.conv1 = nn.Conv2d(1, 32, 3, padding=1)
+#         self.pool1 = nn.MaxPool2d(2, 2, padding=0)
+#         self.bn1 = nn.BatchNorm2d(32)
+#         self.hnet1 = HopfieldNet(32 * 16 * 16) # 32 * 14 * 14 for MNIST
+#         self.conv2 = nn.Conv2d(32, 32, 3, padding=1)
+#         self.pool2 = nn.MaxPool2d(2, 2, padding=0)
+#         self.bn2 = nn.BatchNorm2d(32)
+#         self.hnet2 = HopfieldNet(32 * 8 * 8) # 32 * 7 * 7 for MNIST
+#         self.fc1 = nn.Linear(32 * 8 * 8, 10)
+# 
+#     def forward(self, x):
+#         # layer 1
+#         x = self.conv1(x)
+#         x = self.bn1(x)
+#         x = F.relu(x)
+#         x = self.pool1(x)
+#         b, c, h, w = x.shape
+#         
+#         y = (x > x.mean()).view(b, -1) # reshape here
+#         # moving_average = x.mean(axis=0) * 0.01  + moving_average * 0.99
+#         # use moving average as a threshold above
+#         # mean over all batches!! should be constant or slowly moving
+#         # TODO: try with constants, separate mean over batch and then exp. avg.
+#         # TODO: keep track of the scale, the bias/gamma of the BN, maybe turning off the scaling
+#         self.act1 = y.clone().detach()
+#         for t in range(self.time_steps):
+#             y = self.hnet1.step(y)
+#         y = y.view(b,c,h,w).type(dtype=torch.float32)
+#         y = y * self.i_factor # y * 2 - 1 * self.i_factor # reshape again
+#         helper.print_tensor_info(x, name='x before')
+#         helper.print_tensor_info(y, name='y')
+#         x += y # think of y as a relu and maybe multiplying then makes sense?
+# 
+#         helper.print_tensor_info(x, name='x after')
+# 
+#         # layer 2
+# 
+#         x = self.conv2(x)
+#         x = self.bn2(x)
+#         x = F.relu(x)
+#         x = self.pool2(x)
+# 
+#         b, c, h, w = x.shape
+#         y = (x > x.mean()).view(b, -1)
+#         self.act2 = y.clone().detach()
+#         for t in range(self.time_steps):
+#             y = self.hnet2.step(y)
+#         y = y.view(b,c,h,w).type(dtype=torch.float32)
+#         y = y = y * self.i_factor # y * 2 - 1 * self.i_factor # reshape again
+#         x += y
+# 
+#         # fc and out
+#         x = x.view(-1, 32 * 8 * 8)
+#         x = F.softmax(self.fc1(x), 1)
+#         return x
+# 
+# 
+# class BLH_Network(nn.Module):
+#     def __init__(self, i_factor=1, time_steps=2):
+#         assert False, 'module not yet implemented'
+#         super(BLH_Network, self).__init__()
+# 
+#     def forward(self, x):
+#         return x
 
 
 # -----------------
@@ -344,72 +427,149 @@ def test_recurrent(test_loader, network, criterion, epoch):
     return loss /(i+1), accuracy/(i+1)
 
 
-def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
-    plot_losses = []
-    print_loss_total = 0
-    print_accuracy_total = 0
-    plot_loss_total = 0
-    plot_accuracy_total = 0
-    
-    len_of_data = len(train_loader)
-
-    optimizer = optim.Adam(network.parameters(), lr=learning_rate)
-    
-    criterion = nn.CrossEntropyLoss()
-    
-    for epoch in range(n_epochs):
-        if epoch % test_every == 0:
-            test_loss, test_accurary = test(test_loader, network, criterion,
-                                            epoch)
-            writer.add_scalar('testing/loss', test_loss,
-                              epoch * len_of_data)
-            writer.add_scalar(
-                'testing/accuracy', test_accurary, epoch * len_of_data)
-        start = time.time()
-        # TODO: Recheck the writing of accuracy and error
-        # maybe don't bother with averaging, just write down every 'print_every' steps
-        # rewrite the write down and evaluation.
-        for i_batch, sample_batched in enumerate(train_loader):
-
-            loss, accuracy = train(sample_batched[0], sample_batched[1],
-                                   network, optimizer, criterion)
-
-            print_loss_total += loss
-            plot_loss_total += loss
-            print_accuracy_total += accuracy
-            plot_accuracy_total += accuracy
-
-            if (epoch * len_of_data + i_batch) % print_every == 0:
-                divisor = 1 if (epoch * len_of_data + i_batch) // print_every == 0 else print_every
-                print_loss_avg = print_loss_total / divisor
-                print_loss_total = 0
-                print_accuracy_avg = print_accuracy_total / divisor
-                print_accuracy_total = 0
-                print(" " * 80 + "\r" +
-                      '[Training:] E%d: %s (%d %d%%) %.4f %.4f'
-                      % (epoch, timeSince(start, (i_batch + 1) / len_of_data),
-                          i_batch, (i_batch + 1) / len_of_data * 100,
-                          print_loss_avg, print_accuracy_avg), end="\r")
-
-            if (epoch * len_of_data + i_batch) % plot_every == 0:
-                divisor = 1 if (epoch * len_of_data + i_batch) // plot_every == 0 else plot_every
-                plot_loss_avg = plot_loss_total / divisor
-                plot_loss_total = 0
-                plot_accuracy_avg = plot_accuracy_total / divisor
-                plot_accuracy_total = 0
-
-                plot_losses.append(plot_loss_avg)
-                
-                writer.add_scalar(
-                    'training/loss', plot_loss_avg,
-                      epoch * len_of_data + i_batch)
-                writer.add_scalar(
-                    'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
-            
-                
-        if epoch % save_every == 0:
-                checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
-
+# def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
+#     plot_losses = []
+#     print_loss_total = 0
+#     print_accuracy_total = 0
+#     plot_loss_total = 0
+#     plot_accuracy_total = 0
+#     
+#     len_of_data = len(train_loader)
+# 
+#     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
+#     
+#     criterion = nn.CrossEntropyLoss()
+#     
+#     for epoch in range(n_epochs):
+#         if epoch % test_every == 0:
+#             test_loss, test_accurary = test(test_loader, network, criterion,
+#                                             epoch)
+#             writer.add_scalar('testing/loss', test_loss,
+#                               epoch * len_of_data)
+#             writer.add_scalar(
+#                 'testing/accuracy', test_accurary, epoch * len_of_data)
+#         start = time.time()
+#         # TODO: Recheck the writing of accuracy and error
+#         # maybe don't bother with averaging, just write down every 'print_every' steps
+#         # rewrite the write down and evaluation.
+#         for i_batch, sample_batched in enumerate(train_loader):
+# 
+#             loss, accuracy = train(sample_batched[0], sample_batched[1],
+#                                    network, optimizer, criterion)
+# 
+#             print_loss_total += loss
+#             plot_loss_total += loss
+#             print_accuracy_total += accuracy
+#             plot_accuracy_total += accuracy
+# 
+#             if (epoch * len_of_data + i_batch) % print_every == 0:
+#                 divisor = 1 if (epoch * len_of_data + i_batch) // print_every == 0 else print_every
+#                 print_loss_avg = print_loss_total / divisor
+#                 print_loss_total = 0
+#                 print_accuracy_avg = print_accuracy_total / divisor
+#                 print_accuracy_total = 0
+#                 print(" " * 80 + "\r" +
+#                       '[Training:] E%d: %s (%d %d%%) %.4f %.4f'
+#                       % (epoch, timeSince(start, (i_batch + 1) / len_of_data),
+#                           i_batch, (i_batch + 1) / len_of_data * 100,
+#                           print_loss_avg, print_accuracy_avg), end="\r")
+# 
+#             if (epoch * len_of_data + i_batch) % plot_every == 0:
+#                 divisor = 1 if (epoch * len_of_data + i_batch) // plot_every == 0 else plot_every
+#                 plot_loss_avg = plot_loss_total / divisor
+#                 plot_loss_total = 0
+#                 plot_accuracy_avg = plot_accuracy_total / divisor
+#                 plot_accuracy_total = 0
+# 
+#                 plot_losses.append(plot_loss_avg)
+#                 
+#                 writer.add_scalar(
+#                     'training/loss', plot_loss_avg,
+#                       epoch * len_of_data + i_batch)
+#                 writer.add_scalar(
+#                     'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
+#             
+#                 
+#         if epoch % save_every == 0:
+#                 checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
+# 
+# 
+# 
+#                 
+#                 def train(input_tensor, target_tensor, network, optimizer, criterion):
+#                 
+#                     optimizer.zero_grad()
+#                     input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
+#                     loss = 0
+#                 
+#                     input_tensor = input_tensor[:, 0:1, :, :]
+#                     network_output = network(input_tensor)
+#                     if len(target_tensor.shape) > 1:
+#                         target_tensor = target_tensor.squeeze()
+#                     loss += criterion(network_output, target_tensor)
+#                     topv, topi = network_output.topk(1)
+#                     accuracy = (topi == target_tensor.unsqueeze(1)).sum(
+#                         dim=0, dtype=torch.float64) / topi.shape[0]
+#                 
+#                     loss.backward()
+#                     optimizer.step()
+#                 
+#                     # update the hopfield networks for B-H
+#                     network.hnet1.covariance_update(network.act1)
+#                     network.hnet2.covariance_update(network.act2)
+#                     # look at the patterns that the network stores..
+#                     # think of Hnet as clustering algorithm
+#                 
+#                     loss = loss / topi.shape[0]  # average loss per item
+#                     return loss.item(), accuracy.item()
+#                 
+#                 
+#                 def test(test_loader, network, criterion, epoch):
+#                     loss = 0
+#                     accuracy = 0
+#                     confusion_matrix = torch.zeros(
+#                         CONFIG['classes'], CONFIG['classes'], dtype=torch.int64)
+#                     class_probs = []
+#                     class_preds = []
+#                     
+#                     with torch.no_grad():
+#                         for i, data in enumerate(test_loader):
+#                             inputs, classes = data
+#                             inputs, classes = inputs.to(device), classes.to(device)
+#                             outputs = network(inputs)
+#                             loss += criterion(outputs, classes) / \
+#                                 test_loader.batch_size
+#                             topv, topi = outputs.topk(1)
+#                             accuracy += (topi == classes.unsqueeze(1)).sum(
+#                                 dim=0, dtype=torch.float64) / topi.shape[0]
+#                             
+#                             # confusion matrix construction
+#                             oh_labels = F.one_hot(classes, CONFIG['classes'])
+#                             oh_outputs = F.one_hot(topi, CONFIG['classes']).view(-1,CONFIG['classes'])
+#                             confusion_matrix += torch.matmul(torch.transpose(oh_labels, 0, 1), oh_outputs)
+#                             
+#                             # pr curve construction
+#                             class_probs_batch = [F.softmax(el, dim=0) for el in outputs]
+#                             
+#                             class_probs.append(class_probs_batch)
+#                             class_preds.append(topi)
+#                             
+#                     # pr-curves
+#                     test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, CONFIG['classes'])
+#                     test_preds = torch.cat(class_preds).view(-1)
+#                     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
+#                                                                            loss /(i+1), accuracy/(i+1)), end="\n")
+#                     
+#                     
+#                     return loss /(i+1), accuracy/(i+1), confusion_matrix, test_probs, test_preds
+#                 
+#                 def train_hopfield_part():
+#                     # TODO: implement this correctly
+#                     """
+#                     separate function to train the hopfield network after one epoch of regular
+#                     training is done
+#                     """
+#                     pass
 
 # -----------------
 # Main Training Loop
