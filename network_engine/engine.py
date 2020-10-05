@@ -258,14 +258,12 @@ def test_recurrent(test_loader, network, criterion, epoch):
                
             # update pr curves
             precision_recall.update(outputs[:,-1,:].cpu(), classes.cpu())
-            
-    # pr-curves
-    test_probs = torch.cat([torch.stack(b) for b in class_probs]).view(-1, t+1, CONFIG['classes'])
-    test_preds = torch.cat(class_preds).view(-1)
 
+    #visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), inputs.cpu(), classes.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
+    visual_prediction = None
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
-    return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall
+    return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
 
 
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
@@ -283,14 +281,15 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary, cm, pr = test_recurrent(test_loader, network, criterion, epoch)
+            test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch)
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
             writer.add_scalar(
                 'testing/accuracy', test_accurary, epoch * len_of_data)
-            cm.to_tensorboard(writer, CONFIG['classes'], epoch)
-            # cm.print_misclassified_objects(CONFIG['classes'], 5)
-            pr.to_tensorboard(writer, CONFIG['classes'], epoch)
+            cm.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
+            cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
+            pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
+            #writer.add_figure('predictions vs. actuals', vp, epoch)
             writer.close()
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):

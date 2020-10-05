@@ -372,7 +372,10 @@ def plot_classes_preds(output, images, labels, classes, channels):
             img = img.mean(dim=0)
         img = img / 2 + 0.5     # unnormalize
         npimg = img.numpy()
+
         if one_channel:
+            if len(npimg.shape) > 2:
+                npimg = np.transpose(npimg, (1, 2, 0))[:,:,0]
             ax.imshow(npimg, cmap="Greys")
         else:
             ax.imshow(np.transpose(npimg, (1, 2, 0)))
