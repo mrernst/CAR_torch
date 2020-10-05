@@ -91,9 +91,9 @@ def get_par():
     par['cropped'] = [False]
     par['augmented'] = [False]
 
-    par['write_every'] = [500] # 500
+    par['write_every'] = [100] # 500
     par['test_every'] = [1] # 5
-    par['buffer_size'] = [600000] #[600000]
+    par['buffer_size'] = [60000] #[600000]
     par['verbose'] = [False]
     par['visualization'] = [False] #False
     par['projector'] = [False]
