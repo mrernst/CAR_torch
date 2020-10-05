@@ -69,18 +69,18 @@ def get_par():
 
     par = {}
 
-    par['exp_name'] = ["osmnist2_rcnn_test"]
+    par['exp_name'] = ["mnist_rcnn"]
     # par['name'] must be defined as a FLAG to engine, b/c it resembles the
     # iteration number that gets passed by the sbatch script
     # TODO: add documentation i.e. parameter possibilities
-    par['dataset'] = ["osmnist2"] #osmnist #ycb1_single
+    par['dataset'] = ["mnist"] #osmnist2 #ycb1_single
 
-    par['n_occluders'] = [2]
+    par['n_occluders'] = [0] #2
     par['occlusion_percentage'] = [0]
     par['label_type'] = ["onehot"] #["onehot"]
-    par['connectivity'] = ['B', 'BT', 'BL', 'BLT']#['B', 'BF', 'BK', 'BT', 'BL', 'BLT'] # ['BD', 'BT', 'BL', 'BLT'] # ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['BLT']
+    par['connectivity'] = ['BLT', 'BL', 'BT']#['B', 'BF', 'BK', 'BT', 'BL', 'BLT'] # ['BD', 'BT', 'BL', 'BLT'] # ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['BLT']
     par['BLT_longrange'] = [0]
-    par['time_depth'] = [3]
+    par['time_depth'] = [3, 10, 20]
     par['time_depth_beyond'] = [0]
     par['feature_multiplier'] = [1]
     par['keep_prob'] = [1.0]
@@ -91,7 +91,7 @@ def get_par():
     par['cropped'] = [False]
     par['augmented'] = [False]
 
-    par['write_every'] = [100] # 500
+    par['write_every'] = [500] # 500
     par['test_every'] = [1] # 5
     par['buffer_size'] = [600000] #[600000]
     par['verbose'] = [False]
