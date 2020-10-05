@@ -381,14 +381,14 @@ class RecConvNet(nn.Module):
         super(RecConvNet, self).__init__()
         self.n_features = n_features
         self.rcnn = RecConv(connectivity, input_channels, n_features, kernel_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(n_features * 8 * 8, 10) #8, 8 for osmnist
+        self.fc = nn.Linear(n_features * 7 * 7, 10) #8, 8 for osmnist
 
     def forward(self, x):
         x = self.rcnn(x)
         seq_len = x.size(1)
         output_list = []
         for t in range(seq_len):
-            input = x[:, t, :, :, :].view(x.shape[0], self.n_features * 8 * 8) #8, 8 for osmnist
+            input = x[:, t, :, :, :].view(x.shape[0], self.n_features * 7 * 7) #8, 8 for osmnist
             output_list.append(self.fc(input))
         x = torch.stack(output_list, dim=1)
         return x
