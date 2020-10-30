@@ -135,14 +135,14 @@ def infer_additional_parameters(configuration_dict):
         configuration_dict['connectivity'])
     
     if 'F' in configuration_dict['connectivity']:
-        configuration['kernel_size'] = (3,3)
-        configurateion['n_features'] = 64
+        configuration_dict['kernel_size'] = (3,3)
+        configuration_dict['n_features'] = 64
     if 'K' in configuration_dict['connectivity']:
-        configuration['kernel_size'] = (5,5)
-        configurateion['n_features'] = 32
+        configuration_dict['kernel_size'] = (5,5)
+        configuration_dict['n_features'] = 32
     else:
-        configuration['kernel_size'] = (3,3)
-        configurateion['n_features'] = 32
+        configuration_dict['kernel_size'] = (3,3)
+        configuration_dict['n_features'] = 32
 
     if ('ycb' in configuration_dict['dataset']):
         configuration_dict['image_height'] = 240
