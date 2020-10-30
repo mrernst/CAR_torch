@@ -58,6 +58,60 @@ import torch
 def return_same(x):
     return x
 
+
+# -----------------
+# Class Activation Mapping (CAM)
+# -----------------
+
+
+class CAM(nn.Module):
+    def __init__(self, network):
+        super(CAM, self).__init__()
+        self.network = network
+        
+    def forward(self, x, topk=3):
+        outputs, feature_maps = self.network(x)
+        cam_list = []
+        topk_prob_list = []
+        topk_arg_list = []
+        b, t, c, h, w = feature_maps.size()
+
+        for timestep in range(t):
+            output = outputs[:1,timestep,:]
+            feature_map = feature_maps[:,timestep,:,:,:]
+            
+            probs = F.softmax(output, 1)
+            prob, args = torch.sort(probs, dim=1, descending=True)
+            
+            ## top k class probability
+            topk_prob = prob.squeeze().tolist()[:topk]
+            topk_arg = args.squeeze().tolist()[:topk]
+            # generate class activation map
+            feature_map = feature_map.view(b, c, h*w).transpose(1, 2)
+            
+            fc_weight = nn.Parameter(self.network.fc.weight.t().unsqueeze(0))
+        
+            cam = torch.bmm(feature_map[:1], fc_weight).transpose(1, 2)
+            ## normalize to 0 ~ 1
+            min_val, min_args = torch.min(cam, dim=2, keepdim=True)
+            cam -= min_val
+            max_val, max_args = torch.max(cam, dim=2, keepdim=True)
+            cam /= max_val
+            
+            ## top k class activation map
+            topk_cam = cam.view(1, -1, h, w)[0, topk_arg]
+            topk_cam = nn.functional.interpolate(topk_cam.unsqueeze(0), 
+                                            (x.size(3), x.size(4)), mode='bilinear', align_corners=True).squeeze(0)
+            # topk_cam = torch.split(topk_cam, 1)
+            cam_list.append(topk_cam)
+            topk_prob_list.append(topk_prob)
+            topk_arg_list.append(topk_arg)
+        
+        cam_dict = {'maps':cam_list, 'topk_prob':topk_prob_list, 'topk_arg':topk_arg_list}
+        return outputs, cam_dict
+
+
+
 # -----------------
 # RC Classes
 # -----------------
@@ -121,6 +175,7 @@ class RecConvCell(nn.Module):
         self.bn_all = nn.BatchNorm2d(self.output_channels)
 
         self.activation = nn.ReLU()
+        # TODO: clean this up in order to use it properly
         #self.lrn = nn.LocalResponseNorm(2, alpha=0.0001, beta=0.75, k=1.0)
         self.lrn = return_same
 
@@ -268,7 +323,7 @@ class RecConv(nn.Module):
                     
                 layer_output_list.append(cur_layer_input)
 
-                if self.pooling and (layer_idx < (seq_len - 1)):
+                if self.pooling and (layer_idx < (self.num_layers - 1)):
                     cur_layer_input = self.maxpool(cur_layer_input)
 
 
@@ -316,15 +371,15 @@ class RecConvNet(nn.Module):
         self.fc = nn.Linear(n_features, 10) #8, 8 for osmnist
 
     def forward(self, x):
-        x = self.rcnn(x)
-        x = x.mean(dim=[-2,-1], keepdim=True) #global average pooling
+        feature_map = self.rcnn(x)
+        x = feature_map.mean(dim=[-2,-1], keepdim=True) #global average pooling
         seq_len = x.size(1)
         output_list = []
         for t in range(seq_len):
             input = x[:, t, :, :, :].view(x.shape[0], self.n_features) #8, 8 for osmnist
             output_list.append(self.fc(input))
         x = torch.stack(output_list, dim=1)
-        return x
+        return x, feature_map
 
 
 class B_Network(nn.Module):
