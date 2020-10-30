@@ -380,33 +380,33 @@ network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], 
 
 
 # Datasets
-# train_dataset = ImageFolderLMDB(
-#     db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
-#     transform=transforms.Compose([
-#     transforms.Grayscale(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
-# 
-# test_dataset = ImageFolderLMDB(
-#     db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/test.lmdb',
-#     transform=transforms.Compose([
-#     transforms.Grayscale(),
-#     transforms.ToTensor(),
-#     transforms.Normalize((0.,), (1.,))
-# ]))
+train_dataset = ImageFolderLMDB(
+    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
+    transform=transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
 
-train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
-           transforms.CenterCrop(32),
-           transforms.ToTensor(),
-           transforms.Normalize((0.,), (1.,)),
-       ]))
-    
-test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
-           transforms.CenterCrop(32),
-           transforms.ToTensor(),
-           transforms.Normalize((0.,), (1.,)),
-       ]))
+test_dataset = ImageFolderLMDB(
+    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/test.lmdb',
+    transform=transforms.Compose([
+    transforms.Grayscale(),
+    transforms.ToTensor(),
+    transforms.Normalize((0.,), (1.,))
+]))
+
+# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
+#            transforms.CenterCrop(32),
+#            transforms.ToTensor(),
+#            transforms.Normalize((0.,), (1.,)),
+#        ]))
+#     
+# test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
+#            transforms.CenterCrop(32),
+#            transforms.ToTensor(),
+#            transforms.Normalize((0.,), (1.,)),
+#        ]))
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
