@@ -69,8 +69,7 @@ import math
 # -----
 import utilities.helper as helper
 import utilities.visualizer as visualizer
-from utilities.networks.buildingblocks.hopfield import HopfieldNet
-from utilities.networks.buildingblocks.rcnn import RecConvNet, B_Network
+from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
 
 from utilities.dataset_handler import ImageFolderLMDB
 
@@ -211,12 +210,12 @@ def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
     timesteps = CONFIG['time_depth'] + 1
     input_tensor = input_tensor.unsqueeze(1)
     input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
-    network_output = network(input_tensor)
+    outputs, _ = network(input_tensor)
     
-    for t in range(network_output.shape[1]):
-        loss += criterion(network_output[:,t,:], target_tensor)
+    for t in range(outputs.shape[1]):
+        loss += criterion(outputs[:,t,:], target_tensor)
         
-    topv, topi = network_output[:,t,:].topk(1)
+    topv, topi = outputs[:,t,:].topk(1)
     accuracy = (topi == target_tensor.unsqueeze(1)).sum(
         dim=0, dtype=torch.float64) / topi.shape[0]
         
@@ -243,7 +242,7 @@ def test_recurrent(test_loader, network, criterion, epoch):
             inputs = inputs.unsqueeze(1)
             inputs = inputs.repeat(1, timesteps, 1, 1, 1)
             
-            outputs = network(inputs)
+            outputs, _ = network(inputs)
             for t in range(outputs.shape[1]):
                 loss += criterion(outputs[:,t,:], classes)
             loss /= test_loader.batch_size
@@ -266,6 +265,38 @@ def test_recurrent(test_loader, network, criterion, epoch):
     return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
 
 
+def test_cam(test_loader, network):
+    
+    cam = CAM(network)
+    loss = 0
+    accuracy = 0
+    
+    confusion_matrix = visualizer.ConfusionMatrix(n_cls=CONFIG['classes'])
+    precision_recall = visualizer.PrecisionRecall(n_cls=CONFIG['classes'])
+
+    # TODO: Solve the unroll-timestep handling as a function parameter
+    timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
+    
+    with torch.no_grad():
+        for i, data in enumerate(test_loader):
+            inputs, classes = data
+            inputs, classes = inputs.to(device), classes.to(device)
+            inputs = inputs.unsqueeze(1)
+            inputs = inputs.repeat(1, timesteps, 1, 1, 1)
+            
+            outputs, cam_dict = cam(inputs)
+            cam_dict['maps'] = torch.stack(cam_dict['maps'])
+            # print(cam_dict['maps'].shape)
+            import matplotlib.pyplot as plt
+            # stacked = np.reshape(cam_dict['maps'][:,0,:,:], [32*4, 32])
+            # stacked = np.concatenate([inputs[0,0,0,:,:], stacked], axis=0)
+            # plt.imshow(stacked)
+            # plt.show()
+            fig, ax = visualizer.saliencymap_to_figure(cam_dict['maps'], inputs[0,0,0,:,:])
+            plt.show()
+    pass
+
+
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
     plot_losses = []
     print_loss_total = 0
@@ -278,7 +309,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     optimizer = optim.Adam(network.parameters(), lr=learning_rate)
     
     criterion = nn.CrossEntropyLoss()
-    
+        
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
             test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch)
@@ -346,6 +377,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 
 network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], n_features=CONFIG['n_features']).to(device)
 
+
+
 # Datasets
 # train_dataset = ImageFolderLMDB(
 #     db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
@@ -380,15 +413,19 @@ train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['bat
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
 
 
+
+# test_cam(test_loader, network)
+
+
 output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
 loss_writer = SummaryWriter(output_dir)
-
 
 trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
             test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.pt')
+
 
 
 # evaluation of network (to be outsourced at some point)
