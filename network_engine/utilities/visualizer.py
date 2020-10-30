@@ -155,25 +155,18 @@ def saliencymap_to_figure(smap, pic, alpha=0.5):
     optional value for alpha and returns a matplotlib figure containing the 
     picture overlayed with the saliency map with transparency alpha.
     """
-    number_of_maps_per_axis = int(np.floor(np.sqrt(smap.shape[0])))
-    fig = mpl.figure.Figure(figsize=(
-        number_of_maps_per_axis, number_of_maps_per_axis), dpi=90,
-        facecolor='w', edgecolor='k')
+    number_of_maps = smap.shape[0]
+    fig, axes = plt.subplots(smap.shape[0],smap.shape[1])
 
-    for i in range(np.square(number_of_maps_per_axis)):
-        classmap_answer = smap[i, :, :, 0]
-        vis = list(
-            map(lambda x: ((x - x.min()) / (x.max() - x.min())),
-                classmap_answer))
-        ori = (pic[i, :, :, 0] + 1.) / 2.
-        ax = fig.add_subplot(number_of_maps_per_axis,
-                             number_of_maps_per_axis, (i + 1))
-        ax.imshow(ori, cmap="Greys")
-        ax.imshow(vis, cmap=mpl.cm.jet, alpha=alpha,
-                  interpolation='nearest', vmin=0, vmax=1)
-        ax.axis('off')
+    for i in range(number_of_maps):
+        for j in range(smap.shape[1]):
+            classmap_answer = smap[i, j, :, :]
+            axes[i,j].imshow(pic, cmap="Greys")
+            axes[i,j].imshow(classmap_answer, cmap=mpl.cm.jet, alpha=alpha,
+                      interpolation='nearest', vmin=0, vmax=1)
+            axes[i,j].axis('off')
 
-    return fig
+    return fig, axes
 
 
 class ConfusionMatrix(object):
