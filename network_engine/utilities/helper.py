@@ -133,6 +133,16 @@ def infer_additional_parameters(configuration_dict):
     circuit = importlib.import_module(configuration_dict['network_module'])
     configuration_dict['network_depth'] = circuit.return_network_layers(
         configuration_dict['connectivity'])
+    
+    if 'F' in configuration_dict['connectivity']:
+        configuration['kernel_size'] = (3,3)
+        configurateion['n_features'] = 64
+    if 'K' in configuration_dict['connectivity']:
+        configuration['kernel_size'] = (5,5)
+        configurateion['n_features'] = 32
+    else:
+        configuration['kernel_size'] = (3,3)
+        configurateion['n_features'] = 32
 
     if ('ycb' in configuration_dict['dataset']):
         configuration_dict['image_height'] = 240

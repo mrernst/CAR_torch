@@ -342,7 +342,9 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # -----------------
 
 # Training network
-network = RecConvNet(CONFIG['connectivity'], kernel_size=(3,3), n_features=32).to(device)
+    
+
+network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], n_features=CONFIG['n_features']).to(device)
 
 # Datasets
 # train_dataset = ImageFolderLMDB(

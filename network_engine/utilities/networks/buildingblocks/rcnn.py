@@ -311,7 +311,7 @@ class RecConv(nn.Module):
 
         b, _, _, h, w = input_tensor.size()
 
-        # Implement stateful ConvLSTM
+        # TODO: Implement stateful RCNN
         if hidden_state is not None:
             raise NotImplementedError()
         else:
@@ -418,7 +418,7 @@ class B_Network(nn.Module):
         # print(x.shape)
 
         # x = F.softmax(self.fc1(x), 1), softmax is a applied with cross entropy loss!
-        # print(x.shape)
+        # print(x.shape) AND it should be along dimension 2!!!
 
         return x
 
