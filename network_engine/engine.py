@@ -364,13 +364,15 @@ network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], 
 # ]))
 
 train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
+           transforms.CenterCrop(32),
            transforms.ToTensor(),
-           transforms.Normalize((0.,), (1.,))
+           transforms.Normalize((0.,), (1.,)),
        ]))
     
 test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
+           transforms.CenterCrop(32),
            transforms.ToTensor(),
-           transforms.Normalize((0.,), (1.,))
+           transforms.Normalize((0.,), (1.,)),
        ]))
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
@@ -386,7 +388,7 @@ trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
             test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
 
-torch.save(network.state_dict(), checkpoint_dir + 'network.model')
+torch.save(network.state_dict(), checkpoint_dir + 'network.pt')
 
 
 # evaluation of network (to be outsourced at some point)
