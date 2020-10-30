@@ -381,7 +381,7 @@ network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], 
 
 # Datasets
 train_dataset = ImageFolderLMDB(
-    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/train.lmdb',
+    db_path=CONFIG['input_dir'] + '/osmnist2/train.lmdb',
     transform=transforms.Compose([
     transforms.Grayscale(),
     transforms.ToTensor(),
@@ -389,7 +389,7 @@ train_dataset = ImageFolderLMDB(
 ]))
 
 test_dataset = ImageFolderLMDB(
-    db_path=CONFIG['input_dir'] + '/dynaMO/data/osmnist2/test.lmdb',
+    db_path=CONFIG['input_dir'] + '/osmnist2/test.lmdb',
     transform=transforms.Compose([
     transforms.Grayscale(),
     transforms.ToTensor(),
