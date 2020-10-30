@@ -192,11 +192,6 @@ def infer_additional_parameters(configuration_dict):
     if configuration_dict['stereo']:
         configuration_dict['image_channels'] *= 2
     
-    # use sigmoid for n-hot task, otherwise softmax
-    # if configuration_dict['label_type'] == 'nhot':
-    #     configuration_dict['crossentropy_fn'] = sigmoid_cross_entropy
-    # else:
-    #     configuration_dict['crossentropy_fn'] = softmax_cross_entropy
     
     # to crop the images
     # store the original values
