@@ -38,6 +38,7 @@ Temporary Items
 __pycache__
 tfrecord_files
 data
+osmnist2
 
 # Directories that will be filled by code
 experiments/*
