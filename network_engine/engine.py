@@ -423,7 +423,7 @@ trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
 
 torch.save(network.state_dict(), checkpoint_dir + 'network.pt')
 
-checkpoint(CONFIG['epochs'], network, checkpoint_dir + 'network'), save_every=5)
+checkpoint(CONFIG['epochs'], network, checkpoint_dir + 'network', save_every=5)
 
 # evaluation of network (to be outsourced at some point)
 # -----
