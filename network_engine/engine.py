@@ -109,12 +109,12 @@ def matplotlib_imshow(img, one_channel=False, cmap='Greys'):
 
 
 def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
-    model_out_path = experiment_dir + "model_epoch_{}.pth".format(epoch)
+    model_out_path = experiment_dir + "model_epoch_{}.pt".format(epoch)
     torch.save(model.state_dict(), model_out_path)
     print("[Info:] Checkpoint saved to {}".format(model_out_path, end='\n'))
     if (epoch > 0 and remove_last):
         os.remove(experiment_dir +
-                  "model_epoch_{}.pth".format(epoch - save_every))
+                  "model_epoch_{}.pt".format(epoch - save_every))
 
 class RandomData(Dataset):
     
@@ -265,7 +265,7 @@ def test_recurrent(test_loader, network, criterion, epoch):
     return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
 
 
-def test_cam(test_loader, network):
+def test_final(test_loader, network):
     
     cam = CAM(network)
     loss = 0
@@ -414,8 +414,6 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batch
 
 
 
-# test_cam(test_loader, network)
-
 
 output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
 loss_writer = SummaryWriter(output_dir)
@@ -423,10 +421,9 @@ loss_writer = SummaryWriter(output_dir)
 trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
             test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
-
 torch.save(network.state_dict(), checkpoint_dir + 'network.pt')
 
-
+checkpoint(CONFIG['epochs'], network, checkpoint_dir + 'network'), save_every=5)
 
 # evaluation of network (to be outsourced at some point)
 # -----
