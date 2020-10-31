@@ -139,6 +139,7 @@ class SbatchDocument(object):
             "#SBATCH --time=700:00:00 \n" + \
             "#SBATCH --mem={}GB \n".format(args.memory) + \
             "#SBATCH --reservation triesch-shared \n" + \
+            "#SBATCH --exclude vane \n" + \
             "#SBATCH --partition=sleuths \n" + \
             "#SBATCH --job-name={} \n".format(self.experiment_name) + \
             "#SBATCH --mail-type=END \n" + \
@@ -148,7 +149,7 @@ class SbatchDocument(object):
             "#SBATCH --array=0-{}%{} \n".format(len(paths_to_config_files)-1,
                                                 args.number_of_nodes)
         if args.number_of_gpus > 0:
-            header += "#SBATCH --gres=gpu:rtx2080ti:{} \n\n".format(args.number_of_gpus)
+            header += "#SBATCH --gres=gpu:{} \n\n".format(args.number_of_gpus) #rtx2070super #rtx2080ti
         else:
             header += "\n"
 
