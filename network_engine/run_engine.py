@@ -316,7 +316,7 @@ if __name__ == '__main__':
     # -----
     os.system("screen -dmS tb_monitor")
     os.system("screen -S tb_monitor -p 0 -X stuff \
-        'tf14\n '")
+        'pt\n '")
     os.system("screen -S tb_monitor -p 0 -X stuff \
         'tensorboard --logdir {} --port {}\n '".format(
         environment.data_dir, args.tensorboard_port))
