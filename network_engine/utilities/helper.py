@@ -130,19 +130,6 @@ def infer_additional_parameters(configuration_dict):
     # -----
 
     # read the number of layers from the network file
-    circuit = importlib.import_module(configuration_dict['network_module'])
-    configuration_dict['network_depth'] = circuit.return_network_layers(
-        configuration_dict['connectivity'])
-    
-    if 'F' in configuration_dict['connectivity']:
-        configuration_dict['kernel_size'] = (3,3)
-        configuration_dict['n_features'] = 64
-    if 'K' in configuration_dict['connectivity']:
-        configuration_dict['kernel_size'] = (5,5)
-        configuration_dict['n_features'] = 32
-    else:
-        configuration_dict['kernel_size'] = (3,3)
-        configuration_dict['n_features'] = 32
 
     if ('ycb' in configuration_dict['dataset']):
         configuration_dict['image_height'] = 240
@@ -211,6 +198,24 @@ def infer_additional_parameters(configuration_dict):
             // 10 * 4
     else:
         pass
+    
+    if 'F' in configuration_dict['connectivity']:
+        configuration_dict['kernel_size'] = (3,3)
+        configuration_dict['n_features'] = 64
+        configuration_dict['network_depth'] = 2
+    if 'K' in configuration_dict['connectivity']:
+        configuration_dict['kernel_size'] = (5,5)
+        configuration_dict['n_features'] = 32
+        configuration_dict['network_depth'] = 2
+    if 'D' in configuration_dict['connectivity']:
+        configuration_dict['kernel_size'] = (3,3)
+        configuration_dict['n_features'] = 32
+        configuration_dict['network_depth'] = 4
+    else:
+        configuration_dict['kernel_size'] = (3,3)
+        configuration_dict['n_features'] = 32
+        configuration_dict['network_depth'] = 2
+    
     
     # overwrite the default time_depth if network is not recurrent
     if configuration_dict['connectivity'] in ['B', 'BK', 'BF', 'BD']:

@@ -375,7 +375,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # Training network
     
 
-network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], n_features=CONFIG['n_features']).to(device)
+network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], n_features=CONFIG['n_features'], num_layers=CONFIG['network_depth']).to(device)
 
 
 
@@ -408,9 +408,9 @@ test_dataset = ImageFolderLMDB(
 #            transforms.Normalize((0.,), (1.,)),
 #        ]))
 
-train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
+train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=8)
 
-test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=1)
+test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=8)
 
 
 
