@@ -116,34 +116,6 @@ def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
         os.remove(experiment_dir +
                   "model_epoch_{}.pt".format(epoch - save_every))
 
-class RandomData(Dataset):
-    
-    def __init__(self, length=45, timesteps=4, constant_over_time=False, transform=None):
-        self.length = length
-        self.timesteps = timesteps
-        self.transform = transform
-        if constant_over_time:
-            input_tensor = torch.randint(255,[length, 1, 32, 32], dtype=torch.float)
-            input_tensor = input_tensor.unsqueeze(1)
-            self.data = input_tensor.repeat(1, timesteps, 1, 1, 1)
-        else:
-            self.data = torch.randint(255,[length, timesteps, 1, 32, 32], dtype=torch.float)
-        self.labels = torch.randint(9, [length], dtype=torch.float)
-        
-    def __len__(self):
-        return self.length
-
-    def __getitem__(self, idx):
-        if torch.is_tensor(idx):
-            idx = idx.tolist()
-
-        image = self.data[idx]
-        label = self.labels[idx]
-        
-        if self.transform:
-            image = self.transform(image)
-
-        return image, label
 
 # cross-platform development
 
