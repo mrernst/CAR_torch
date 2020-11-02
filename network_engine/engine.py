@@ -237,7 +237,7 @@ def test_recurrent(test_loader, network, criterion, epoch):
     
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            inputs, classes = data
+            inputs, classes = data # TODO stereo data needs to be merged here?
             inputs, classes = inputs.to(device), classes.to(device)
             inputs = inputs.unsqueeze(1)
             inputs = inputs.repeat(1, timesteps, 1, 1, 1)
