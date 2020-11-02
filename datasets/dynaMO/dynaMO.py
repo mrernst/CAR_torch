@@ -47,7 +47,7 @@ parser.add_argument(
      "--outputformat",
      type=str,
      default='bmp',
-     help='output format (.bmp, .png, .jpg, lmdb format)')
+     help='output format (.bmp, .png, .jpg)')
 parser.add_argument(
      "-n",
      "--name",
