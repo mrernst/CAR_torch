@@ -402,39 +402,42 @@ def folder2lmdb(dpath, name="train", write_frequency=5000, num_workers=16):
 def stereofolder2lmdb(dpath, name, write_frequency=5000, num_workers=16):
 	directory = os.path.expanduser(dpath)
 	print("Loading dataset from %s" % directory)
-	dataset = StereoImageFolder(directory, stereo=True, train=True, loader=raw_reader)
-	data_loader = DataLoader(dataset, num_workers=num_workers, collate_fn=lambda x: x)
-
-	lmdb_path = os.path.join(dpath, "%s.lmdb" % name)
-	isdir = os.path.isdir(lmdb_path)
-
-	print("Generate LMDB to %s" % lmdb_path)
-	db = lmdb.open(lmdb_path, subdir=isdir,
-				   map_size=1099511627776,
-				   readonly=False,
-				   meminit=False, map_async=True)
 	
-	print(len(dataset), len(data_loader))
-	txn = db.begin(write=True)
-	for idx, data in enumerate(data_loader):
-		# print(type(data), data)
-		(image_l, image_r), label = data[0]
-		txn.put(u'{}'.format(idx).encode('ascii'), dumps_pyarrow(((image_l, image_r), label)))
-		if idx % write_frequency == 0:
-			print("[%d/%d]" % (idx, len(data_loader)))
-			txn.commit()
-			txn = db.begin(write=True)
-
-	# finish iterating through dataset
-	txn.commit()
-	keys = [u'{}'.format(k).encode('ascii') for k in range(idx + 1)]
-	with db.begin(write=True) as txn:
-		txn.put(b'__keys__', dumps_pyarrow(keys))
-		txn.put(b'__len__', dumps_pyarrow(len(keys)))
-
-	print("Flushing database ...")
-	db.sync()
-	db.close()
+	for train_bool in [True, False]:
+		finalname = name + '_train' if train_bool else name + '_test'
+		dataset = StereoImageFolder(directory, stereo=True, train=train_bool, loader=raw_reader)
+		data_loader = DataLoader(dataset, num_workers=num_workers, collate_fn=lambda x: x)
+	
+		lmdb_path = os.path.join(dpath, "%s.lmdb" % finalname)
+		isdir = os.path.isdir(lmdb_path)
+	
+		print("Generate LMDB to %s" % lmdb_path)
+		db = lmdb.open(lmdb_path, subdir=isdir,
+					   map_size=1099511627776,
+					   readonly=False,
+					   meminit=False, map_async=True)
+		
+		print(len(dataset), len(data_loader))
+		txn = db.begin(write=True)
+		for idx, data in enumerate(data_loader):
+			# print(type(data), data)
+			(image_l, image_r), label = data[0]
+			txn.put(u'{}'.format(idx).encode('ascii'), dumps_pyarrow(((image_l, image_r), label)))
+			if idx % write_frequency == 0:
+				print("[%d/%d]" % (idx, len(data_loader)))
+				txn.commit()
+				txn = db.begin(write=True)
+	
+		# finish iterating through dataset
+		txn.commit()
+		keys = [u'{}'.format(k).encode('ascii') for k in range(idx + 1)]
+		with db.begin(write=True) as txn:
+			txn.put(b'__keys__', dumps_pyarrow(keys))
+			txn.put(b'__len__', dumps_pyarrow(len(keys)))
+	
+		print("Flushing database ...")
+		db.sync()
+		db.close()
 
 
 
@@ -474,13 +477,17 @@ if __name__ == "__main__":
 	import argparse
 	parser = argparse.ArgumentParser()
 	parser.add_argument("-f", "--folder", type=str)
-	parser.add_argument('-s', '--split', type=str, default="val")
-	parser.add_argument('--out', type=str, default=".")
+	parser.add_argument('-n', '--name', type=str, default="dataset")
 	parser.add_argument('-p', '--procs', type=int, default=20)
-
+	parser.add_argument( "-os", "--stereo", type=bool, default=False)
+	
+	
 	args = parser.parse_args()
-
-	folder2lmdb(args.folder, num_workers=args.procs, name=args.split)
+	
+	if args.stereo:
+		stereofolder2lmdb(args.folder, name=args.name)
+	else:
+		folder2lmdb(args.folder, num_workers=args.procs, name=args.name)
 
 	
 # _____________________________________________________________________________
