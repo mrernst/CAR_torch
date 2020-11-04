@@ -343,7 +343,7 @@ def images_to_probs(output, images):
     return preds, [torch.nn.functional.softmax(el, dim=0)[i].item() for i, el in zip(preds, output)]
 
 
-def plot_classes_preds(output, images, labels, classes, channels):
+def plot_classes_preds(output, images, labels, classes):
     '''
     Generates matplotlib Figure using a trained network, along with images
     and labels from a batch, that shows the network's top prediction along
@@ -351,16 +351,21 @@ def plot_classes_preds(output, images, labels, classes, channels):
     information based on whether the prediction was correct or not.
     Uses the "images_to_probs" function.
     '''
-    one_channel = True if channels == 1 else False
+    _,_,channels,height,width = images.shape
+    one_channel = True if channels in [1, 2] else False
+    stereo = True if (channels % 2) == 0 else False
+    
     preds, probs = images_to_probs(output, images)
     # plot the images in the batch, along with predicted and true labels
     fig = mpl.figure.Figure(
         figsize=(12, 12), dpi=90, facecolor='w', edgecolor='k')
-    total_imgs = len(images) if len(images) < 25 else 25
+    total_imgs = len(images) if len(images) < 10 else 10
     for idx in np.arange(total_imgs):
         ax = fig.add_subplot(5, 5, idx+1, xticks=[], yticks=[])
-        #matplotlib_imshow(images[idx], ax, one_channel=True)
         img = images[idx]
+        if stereo:
+            img = img.view(1,channels//2,height*2,width)
+            print(img.shape)
         if one_channel:
             img = img.mean(dim=0)
         img = img / 2 + 0.5     # unnormalize

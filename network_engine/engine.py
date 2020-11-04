@@ -229,9 +229,9 @@ def test_recurrent(test_loader, network, criterion, epoch, timesteps, stereo):
                
             # update pr curves
             precision_recall.update(outputs[:,-1,:].cpu(), target_tensor.cpu())
-
-    #visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor.cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
-    visual_prediction = None
+    
+    visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor.cpu(), target_tensor.cpu(), CONFIG['class_encoding'])
+    #visual_prediction = None
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
     return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
@@ -288,18 +288,20 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
             test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+            
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
             writer.add_scalar(
                 'testing/accuracy', test_accurary, epoch * len_of_data)
+            #network.log_stats(writer) # implement weight stat logging
+            
             cm.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
             cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
             pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
-            #writer.add_figure('predictions vs. actuals', vp, epoch)
-            writer.close()
+            writer.add_figure('predictions vs. actuals', vp, epoch)
+            # writer.close()
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
-            
             loss, accuracy = train_recurrent(
                 sample_batched[0], sample_batched[1],
                 network, optimizer, criterion, CONFIG['time_depth'] + 1, CONFIG['stereo'])
@@ -335,7 +337,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                       epoch * len_of_data + i_batch)
                 writer.add_scalar(
                     'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
-                writer.close()
+                # writer.close()
                 
             
         if epoch % save_every == 0:
@@ -350,10 +352,16 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 
 # configure network
 
-network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], input_channels=CONFIG['image_channels'],  n_features=CONFIG['n_features'], num_layers=CONFIG['network_depth'], num_targets=CONFIG['classes']).to(device)
+network = RecConvNet(
+    CONFIG['connectivity'],
+    kernel_size=CONFIG['kernel_size'], input_channels=CONFIG['image_channels'],
+    n_features=CONFIG['n_features'],
+    num_layers=CONFIG['network_depth'], 
+    num_targets=CONFIG['classes']
+    ).to(device)
 
 
-# input transformations
+# input transformation
 
 if CONFIG['color'] == 'grayscale':
     train_transform = transforms.Compose([
@@ -420,12 +428,11 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batch
 
 
 output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
-loss_writer = SummaryWriter(output_dir)
+stats_writer = SummaryWriter(output_dir)
 
-trainEpochs(train_loader, test_loader, network, loss_writer, CONFIG['epochs'],
-            test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
+trainEpochs(train_loader, test_loader, network, stats_writer, 
+    CONFIG['epochs'], test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
 
-torch.save(network.state_dict(), checkpoint_dir + 'network.pt')
 
 checkpoint(CONFIG['epochs'], network, checkpoint_dir + 'network', save_every=5)
 
