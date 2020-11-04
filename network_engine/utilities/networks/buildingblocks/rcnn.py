@@ -364,11 +364,11 @@ class RecConv(nn.Module):
 
 
 class RecConvNet(nn.Module):
-    def __init__(self, connectivity, kernel_size, input_channels=1, n_features=32, num_layers=2):
+    def __init__(self, connectivity, kernel_size, input_channels=1, n_features=32, num_layers=2, num_targets=10):
         super(RecConvNet, self).__init__()
-        self.n_features = n_features
         self.rcnn = RecConv(connectivity, input_channels, n_features, kernel_size, num_layers, batch_first=True)
-        self.fc = nn.Linear(n_features, 10) #8, 8 for osmnist
+        self.fc = nn.Linear(n_features, num_targets)
+        self.n_features = n_features
 
     def forward(self, x):
         feature_map = self.rcnn(x)
@@ -380,6 +380,16 @@ class RecConvNet(nn.Module):
             output_list.append(self.fc(input))
         x = torch.stack(output_list, dim=1)
         return x, feature_map
+    
+    def log_stats(self, writer):
+        for layer in num_layers: #self.xxx
+            connectivity = layer.connectivity
+            
+        # log mean, median, sd, min, max of weights
+        pass
+    
+    def _varstats(self, variable):
+        return mean(variable)
 
 
 class B_Network(nn.Module):
