@@ -176,6 +176,8 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
     
     optimizer.zero_grad()
+    if CONFIG['stereo']:
+        input_tensor = torch.cat(input_tensor, dim=1)
     input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
     loss = 0
     # TODO: Solve the timestep handling as a function parameter
@@ -209,7 +211,9 @@ def test_recurrent(test_loader, network, criterion, epoch):
     
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            inputs, classes = data # TODO stereo data needs to be merged here?
+            inputs, classes = data
+            if CONFIG['stereo']:
+                inputs = torch.cat(inputs, dim=1)
             inputs, classes = inputs.to(device), classes.to(device)
             inputs = inputs.unsqueeze(1)
             inputs = inputs.repeat(1, timesteps, 1, 1, 1)
@@ -296,7 +300,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
             writer.close()
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
-
+            
             loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
                                    network, optimizer, criterion)
 
