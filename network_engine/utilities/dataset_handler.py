@@ -153,6 +153,16 @@ class ToTimeSeries(object):
 		image_array = image_array.reshape(self.height, self.width, -1, order='F')
 		return image_array
 
+
+def raw_reader(path):
+	with open(path, 'rb') as f:
+		bin_data = f.read()
+	return bin_data
+
+def pil_loader(path):
+	with open(path, 'rb') as f:
+		img = Image.open(f)
+		return img.convert('RGB')
 		
 class StereoImageFolder(Dataset):
 	"""Modified ImageFolder Structure to Import Stereoscopic Data"""
@@ -208,9 +218,14 @@ class StereoImageFolder(Dataset):
 		
 		
 		target = []
-		for t in self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]:
-			target.append(int(t))
-		target = np.array(target, dtype=np.uint8)
+		t_list = self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]
+		
+		if t_list.__class__ == str:
+			target = np.array(t_list, dtype=np.int64) # target.append(int(t_list))
+		else:
+			for t in self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]:
+				target.append(int(t))
+			target = np.array(target, dtype=np.int64)
 		
 		if self.target_transform is not None:
 			target = self.target_transform(target)
@@ -252,6 +267,10 @@ class ImageFolderLMDB(Dataset):
 		self.transform = transform
 		self.target_transform = target_transform
 
+	
+	def __len__(self):
+		return self.length
+
 	def __getitem__(self, index):
 		img, target = None, None
 		env = self.env
@@ -285,7 +304,7 @@ class ImageFolderLMDB(Dataset):
 
 
 class StereoImageFolderLMDB(Dataset):
-	def __init__(self, db_path, stereo=True, transform=None, target_transform=None):
+	def __init__(self, db_path, stereo=False, transform=None, target_transform=None):
 		self.db_path = db_path
 		self.env = lmdb.open(db_path, subdir=os.path.isdir(db_path),
 							 readonly=True, lock=False,
@@ -298,6 +317,9 @@ class StereoImageFolderLMDB(Dataset):
 		self.stereo = stereo
 		self.transform = transform
 		self.target_transform = target_transform
+	
+	def __len__(self):
+		return self.length
 	
 	def __getitem__(self, index):
 		img_l, img_r, target = None, None, None
@@ -340,16 +362,6 @@ class StereoImageFolderLMDB(Dataset):
 			
 			return img_l, target
 
-
-def raw_reader(path):
-	with open(path, 'rb') as f:
-		bin_data = f.read()
-	return bin_data
-
-def pil_loader(path):
-	with open(path, 'rb') as f:
-		img = Image.open(f)
-		return img.convert('RGB')
 
 def dumps_pyarrow(obj):
 	"""
@@ -485,7 +497,7 @@ if __name__ == "__main__":
 	args = parser.parse_args()
 	
 	if args.stereo:
-		stereofolder2lmdb(args.folder, name=args.name)
+		stereofolder2lmdb(args.folder, num_workers=args.procs, name=args.name)
 	else:
 		folder2lmdb(args.folder, num_workers=args.procs, name=args.name)
 
