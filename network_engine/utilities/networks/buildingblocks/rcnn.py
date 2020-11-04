@@ -381,15 +381,38 @@ class RecConvNet(nn.Module):
         x = torch.stack(output_list, dim=1)
         return x, feature_map
     
-    def log_stats(self, writer):
-        for layer in num_layers: #self.xxx
+    def log_stats(self, writer, step):
+        for i, layer in enumerate(self.rcnn.cell_list):
             connectivity = layer.connectivity
+            self._varstats2tb(layer.bottomup.weight,
+                'layer{}/B_weights'.format(i+1), writer, step)
+            self._varstats2tb(layer.bottomup.bias,
+                'layer{}/B_bias'.format(i+1), writer, step)
+            if 'L' in connectivity:
+                self._varstats2tb(layer.lateral.weight,
+                    'layer{}/L_weights'.format(i+1), writer, step)
+                self._varstats2tb(layer.lateral.bias,
+                    'layer{}/L_bias'.format(i+1), writer, step)
+            if ('T' in connectivity) and (i > 0):
+                self._varstats2tb(layer.topdown.weight,
+                    'layer{}/T_weights'.format(i+1), writer, step)
+                self._varstats2tb(layer.topdown.bias,
+                    'layer{}/T_bias'.format(i+1), writer, step)
             
-        # log mean, median, sd, min, max of weights
-        pass
-    
-    def _varstats(self, variable):
-        return mean(variable)
+    def _varstats2tb(self, variable, name, writer, step):
+        variable = variable.detach()
+        writer.add_scalar(
+            'network/{}/mean'.format(name), variable.mean(), step)
+        writer.add_scalar(
+            'network/{}/std'.format(name), variable.std(), step)
+        writer.add_scalar(
+            'network/{}/min'.format(name), variable.min(), step)
+        writer.add_scalar(
+            'network/{}/max'.format(name), variable.max(), step)
+        writer.add_scalar(
+            'network/{}/median'.format(name), variable.median(), step)
+
+
 
 
 class B_Network(nn.Module):

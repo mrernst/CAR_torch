@@ -293,7 +293,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                               epoch * len_of_data)
             writer.add_scalar(
                 'testing/accuracy', test_accurary, epoch * len_of_data)
-            #network.log_stats(writer) # implement weight stat logging
+            network.log_stats(writer, epoch * len_of_data)
             
             cm.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
             cm.print_misclassified_objects(CONFIG['class_encoding'], 5)

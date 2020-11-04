@@ -365,7 +365,6 @@ def plot_classes_preds(output, images, labels, classes):
         img = images[idx]
         if stereo:
             img = img.view(1,channels//2,height*2,width)
-            print(img.shape)
         if one_channel:
             img = img.mean(dim=0)
         img = img / 2 + 0.5     # unnormalize
