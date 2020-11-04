@@ -269,15 +269,15 @@ def infer_additional_parameters(configuration_dict):
     
     # change the image height and image width if the network is supposed
     
-    if configuration_dict['cropped'] or configuration_dict['augmented']:
-        configuration_dict['image_height'] = \
-            configuration_dict['image_width']\
-            // 10 * 4
-        configuration_dict['image_width'] = \
-            configuration_dict['image_width']\
-            // 10 * 4
-    else:
-        pass
+    # if configuration_dict['cropped'] or configuration_dict['augmented']:
+    #     configuration_dict['image_height'] = \
+    #         configuration_dict['image_width']\
+    #         // 10 * 4
+    #     configuration_dict['image_width'] = \
+    #         configuration_dict['image_width']\
+    #         // 10 * 4
+    # else:
+    #     pass
     
     if 'F' in configuration_dict['connectivity']:
         configuration_dict['kernel_size'] = (3,3)
