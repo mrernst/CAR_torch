@@ -173,15 +173,14 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # -----------------
 
 
-def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
+def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion, timesteps, stereo):
     
     optimizer.zero_grad()
-    if CONFIG['stereo']:
+    if stereo:
         input_tensor = torch.cat(input_tensor, dim=1)
     input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
     loss = 0
     # TODO: Solve the timestep handling as a function parameter
-    timesteps = CONFIG['time_depth'] + 1
     input_tensor = input_tensor.unsqueeze(1)
     input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
     outputs, _ = network(input_tensor)
@@ -199,78 +198,78 @@ def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion):
    
     return loss.item(), accuracy.item()   
     
-def test_recurrent(test_loader, network, criterion, epoch):
+def test_recurrent(test_loader, network, criterion, epoch, timesteps, stereo):
     loss = 0
     accuracy = 0
     
-    confusion_matrix = visualizer.ConfusionMatrix(n_cls=CONFIG['classes'])
-    precision_recall = visualizer.PrecisionRecall(n_cls=CONFIG['classes'])
-
-    # TODO: Solve the unroll-timestep handling as a function parameter
-    timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
+    confusion_matrix = visualizer.ConfusionMatrix(n_cls=network.fc.out_features)
+    precision_recall = visualizer.PrecisionRecall(n_cls=network.fc.out_features)
     
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            inputs, classes = data
-            if CONFIG['stereo']:
-                inputs = torch.cat(inputs, dim=1)
-            inputs, classes = inputs.to(device), classes.to(device)
-            inputs = inputs.unsqueeze(1)
-            inputs = inputs.repeat(1, timesteps, 1, 1, 1)
+            input_tensor, target_tensor = data
+            if stereo:
+                input_tensor = torch.cat(input_tensor, dim=1)
+            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
+            input_tensor = input_tensor.unsqueeze(1)
+            input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
             
-            outputs, _ = network(inputs)
+            outputs, _ = network(input_tensor)
             for t in range(outputs.shape[1]):
-                loss += criterion(outputs[:,t,:], classes)
+                loss += criterion(outputs[:,t,:], target_tensor)
             loss /= test_loader.batch_size
             # outputs at other timesteps?
             topv, topi = outputs[:,t,:].topk(1)
-            accuracy += (topi == classes.unsqueeze(1)).sum(
+            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
             
             
             # update confusion matrix
-            confusion_matrix.update(outputs[:,-1,:].cpu(), classes.cpu())
+            confusion_matrix.update(outputs[:,-1,:].cpu(), target_tensor.cpu())
                
             # update pr curves
-            precision_recall.update(outputs[:,-1,:].cpu(), classes.cpu())
+            precision_recall.update(outputs[:,-1,:].cpu(), target_tensor.cpu())
 
-    #visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), inputs.cpu(), classes.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
+    #visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor.cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     visual_prediction = None
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
     return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
 
 
-def test_final(test_loader, network):
+def test_final(test_loader, network, timesteps, stereo):
     
     cam = CAM(network)
     loss = 0
     accuracy = 0
     
-    confusion_matrix = visualizer.ConfusionMatrix(n_cls=CONFIG['classes'])
-    precision_recall = visualizer.PrecisionRecall(n_cls=CONFIG['classes'])
+    confusion_matrix = visualizer.ConfusionMatrix(n_cls=network.fc.out_features)
+    precision_recall = visualizer.PrecisionRecall(n_cls=network.fc.out_features)
 
     # TODO: Solve the unroll-timestep handling as a function parameter
-    timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
+    #timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
     
     with torch.no_grad():
         for i, data in enumerate(test_loader):
-            inputs, classes = data
-            inputs, classes = inputs.to(device), classes.to(device)
-            inputs = inputs.unsqueeze(1)
-            inputs = inputs.repeat(1, timesteps, 1, 1, 1)
+            input_tensor, target_tensor = data
+            if stereo:
+                input_tensor = torch.cat(input_tensor, dim=1)
+            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
+            input_tensor = input_tensor.unsqueeze(1)
+            input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
             
-            outputs, cam_dict = cam(inputs)
+            outputs, cam_dict = cam(input_tensor)
+            #TODO return this in a tensorboard compatible format
             cam_dict['maps'] = torch.stack(cam_dict['maps'])
-            # print(cam_dict['maps'].shape)
             import matplotlib.pyplot as plt
             # stacked = np.reshape(cam_dict['maps'][:,0,:,:], [32*4, 32])
-            # stacked = np.concatenate([inputs[0,0,0,:,:], stacked], axis=0)
+            # stacked = np.concatenate([input_tensor[0,0,0,:,:], stacked], axis=0)
             # plt.imshow(stacked)
             # plt.show()
-            fig, ax = visualizer.saliencymap_to_figure(cam_dict['maps'], inputs[0,0,0,:,:])
+            fig, ax = visualizer.saliencymap_to_figure(cam_dict['maps'], input_tensor[0,0,0,:,:])
             plt.show()
-    pass
+        visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor.cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
+    return visual_prediction
 
 
 def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
@@ -288,7 +287,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         
     for epoch in range(n_epochs):
         if epoch % test_every == 0:
-            test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch)
+            test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
             writer.add_scalar('testing/loss', test_loss,
                               epoch * len_of_data)
             writer.add_scalar(
@@ -301,8 +300,9 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         start = time.time()
         for i_batch, sample_batched in enumerate(train_loader):
             
-            loss, accuracy = train_recurrent(sample_batched[0], sample_batched[1],
-                                   network, optimizer, criterion)
+            loss, accuracy = train_recurrent(
+                sample_batched[0], sample_batched[1],
+                network, optimizer, criterion, CONFIG['time_depth'] + 1, CONFIG['stereo'])
 
             print_loss_total += loss
             plot_loss_total += loss
