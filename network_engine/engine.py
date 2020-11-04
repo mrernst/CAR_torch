@@ -71,7 +71,7 @@ import utilities.helper as helper
 import utilities.visualizer as visualizer
 from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
 
-from utilities.dataset_handler import ImageFolderLMDB
+from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder
 
 
 def asMinutes(s):
@@ -344,29 +344,58 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
 # Main Training Loop
 # -----------------
 
-# Training network
+# configure network
 
-network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], n_features=CONFIG['n_features'], num_layers=CONFIG['network_depth']).to(device)
+network = RecConvNet(CONFIG['connectivity'], kernel_size=CONFIG['kernel_size'], input_channels=CONFIG['image_channels'],  n_features=CONFIG['n_features'], num_layers=CONFIG['network_depth'], num_targets=CONFIG['classes']).to(device)
 
 
+# input transformations
 
-# Datasets
-train_dataset = ImageFolderLMDB(
-    db_path=CONFIG['input_dir'] + '/osmnist2/train.lmdb',
-    transform=transforms.Compose([
-    transforms.Grayscale(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
+if CONFIG['color'] == 'grayscale':
+    train_transform = transforms.Compose([
+        transforms.Grayscale(),
+        transforms.ToTensor(),
+        transforms.Normalize((0.,), (1.,))
+    ])
+    test_transform = train_transform
+else:
+    train_transform = transforms.Compose([
+        transforms.ToTensor(),
+        transforms.Normalize((0.,), (1.,))
+    ])
+    test_transform = train_transform
 
-test_dataset = ImageFolderLMDB(
-    db_path=CONFIG['input_dir'] + '/osmnist2/test.lmdb',
-    transform=transforms.Compose([
-    transforms.Grayscale(),
-    transforms.ToTensor(),
-    transforms.Normalize((0.,), (1.,))
-]))
+# Datasets LMDB Style
+try:
+    train_dataset = StereoImageFolderLMDB(
+        db_path=CONFIG['input_dir'] + '/{}/{}_train.lmdb'.format(CONFIG['dataset'], CONFIG['dataset']),
+        stereo=CONFIG['stereo'],
+        transform=train_transform
+        )
+    
+    test_dataset = StereoImageFolderLMDB(
+        db_path=CONFIG['input_dir'] + '/{}/{}_test.lmdb'.format(CONFIG['dataset'], CONFIG['dataset']),
+        stereo=CONFIG['stereo'],
+        transform=test_transform
+        )
+except:
+    print('[INFO] No LMDB-file available, using standard folder instead')
+    # Datasets direct import
+    train_dataset = StereoImageFolder(
+        root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
+        train=True,
+        stereo=CONFIG['stereo'],
+        transform=train_transform
+        )
+        
+    test_dataset = StereoImageFolder(
+        root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
+        train=False,
+        stereo=CONFIG['stereo'],
+        transform=test_transform
+        )
 
+# MNIST for testing
 # train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
 #            transforms.CenterCrop(32),
 #            transforms.ToTensor(),
