@@ -230,7 +230,7 @@ def test_recurrent(test_loader, network, criterion, epoch, timesteps, stereo):
             # update pr curves
             precision_recall.update(outputs[:,-1,:].cpu(), target_tensor.cpu())
     
-    visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor.cpu(), target_tensor.cpu(), CONFIG['class_encoding'])
+    visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'])
     #visual_prediction = None
     print(" " * 80 + "\r" + '[Testing:] E%d: %.4f %.4f' % (epoch,
                                                        loss /(i+1), accuracy/(i+1)), end="\n")
@@ -268,7 +268,7 @@ def test_final(test_loader, network, timesteps, stereo):
             # plt.show()
             fig, ax = visualizer.saliencymap_to_figure(cam_dict['maps'], input_tensor[0,0,0,:,:])
             plt.show()
-        visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor.cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
+        visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     return visual_prediction
 
 

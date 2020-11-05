@@ -351,7 +351,9 @@ def plot_classes_preds(output, images, labels, classes):
     information based on whether the prediction was correct or not.
     Uses the "images_to_probs" function.
     '''
-    _,_,channels,height,width = images.shape
+    _,channels,height,width = images.shape
+    print(images.shape, 'images shape')
+    print(output.shape)
     one_channel = True if channels in [1, 2] else False
     stereo = True if (channels % 2) == 0 else False
     
