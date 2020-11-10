@@ -43,3 +43,7 @@ osmnist2r_reduced
 # Directories that will be filled by code
 experiments/*
 utilities/tsne/*
+
+# change in future
+datasets/os*
+datasets/BLT*
