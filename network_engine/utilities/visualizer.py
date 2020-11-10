@@ -146,27 +146,7 @@ def make_cmap(colors, position=None, bit=False):
 
 
 
-# saliency maps or class activation mapping
-# -----
 
-def saliencymap_to_figure(smap, pic, alpha=0.5):
-    """
-    saliencymap_to_figure takes a saliency map smap, a picture pic and an
-    optional value for alpha and returns a matplotlib figure containing the 
-    picture overlayed with the saliency map with transparency alpha.
-    """
-    number_of_maps = smap.shape[0]
-    fig, axes = plt.subplots(smap.shape[0],smap.shape[1])
-
-    for i in range(number_of_maps):
-        for j in range(smap.shape[1]):
-            classmap_answer = smap[i, j, :, :]
-            axes[i,j].imshow(pic, cmap="Greys")
-            axes[i,j].imshow(classmap_answer, cmap=mpl.cm.jet, alpha=alpha,
-                      interpolation='nearest', vmin=0, vmax=1)
-            axes[i,j].axis('off')
-
-    return fig, axes
 
 
 class ConfusionMatrix(object):
@@ -352,8 +332,7 @@ def plot_classes_preds(output, images, labels, classes):
     Uses the "images_to_probs" function.
     '''
     _,channels,height,width = images.shape
-    print(images.shape, 'images shape')
-    print(output.shape)
+    
     one_channel = True if channels in [1, 2] else False
     stereo = True if (channels % 2) == 0 else False
     
@@ -387,6 +366,78 @@ def plot_classes_preds(output, images, labels, classes):
     
     return fig
 
+
+# saliency maps or class activation mapping
+# -----
+
+def saliencymap_to_figure(smap, pic, alpha=0.5):
+    """
+    saliencymap_to_figure takes a saliency map smap, a picture pic and an
+    optional value for alpha and returns a matplotlib figure containing the 
+    picture overlayed with the saliency map with transparency alpha.
+    """
+    number_of_maps = smap.shape[0]
+    fig, axes = plt.subplots(smap.shape[0],smap.shape[1])
+    
+    for i in range(number_of_maps):
+        for j in range(smap.shape[1]):
+            classmap_answer = smap[i, j, :, :]
+            axes[i,j].imshow(pic, cmap="Greys")
+            axes[i,j].imshow(classmap_answer, cmap=mpl.cm.jet, alpha=alpha,
+                      interpolation='nearest', vmin=0, vmax=1)
+            axes[i,j].axis('off')
+
+    return fig, axes
+
+
+#cam_dict = {'maps':cam_list, 'topk_prob':topk_prob_list, 'topk_arg':topk_arg_list}
+
+def plot_saliencymap_overview(cams, pics, targets, probs, preds, alpha=0.5, mean=False):
+    """
+    cams (b,t,topk,h,w)        Class Activation Maps
+    pics (b,t,channels,h,w)    Input Images for Recurrent Network
+    targets (b)                Target Vectors
+    probs (b,t,topk)           Probabilities for Each output
+    preds (b,t,topk)           Predictions of the Network
+    """
+    b,t,c,h,w = pics.shape
+    fig, axes = plt.subplots(t,t, figsize=(12,12))
+    
+    if mean:
+        cams = cams.mean(0)
+        pics = np.zeros_like(pics.mean(0))
+        targets = 'mult.'
+        probs = probs[0]
+        preds = preds[0]
+        alpha = 1.0
+        
+    else:
+        cams = cams[0]
+        pics = pics[0]
+        targets = targets[0]
+        probs = probs[0]
+        preds = preds[0]
+    
+    for i in range(t):
+        axes[0,i].imshow(pics[i,0,:,:], cmap="Greys")
+        axes[0,i].imshow(cams[i,0,:,:], cmap=mpl.cm.jet, alpha=alpha,
+              interpolation='nearest')#, vmin=0, vmax=1)
+        axes[0,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+    
+    for i in range(1,t):
+        for j in range(1,i+1):
+            axes[j,i].imshow(pics[i,0,:,:], cmap="Greys")
+            axes[j,i].imshow(cams[i,0,:,:] - cams[i-j,0,:,:], cmap=mpl.cm.seismic, alpha=alpha,
+                  interpolation='nearest')#, vmin=-1, vmax=1)
+            axes[j,i].set_title('t{}-t{}'.format(i,i-j))
+            
+    
+    for j in range(1,t):
+        for i in range(0,j):
+            axes[j,i].axis('off')
+    
+    plt.show()
+    pass
 
 
 # ---------------------
