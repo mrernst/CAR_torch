@@ -258,21 +258,16 @@ def test_final(test_loader, network, timesteps, stereo):
             input_tensor = input_tensor.unsqueeze(1)
             input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
             
-            outputs, cam_dict = cam(input_tensor)
+            outputs, (cams, topk_prob, topk_pred) = cam(input_tensor)
+            print(target_tensor[0])
+            print(topk_pred[0])
             #TODO return this in a tensorboard compatible format
-            cam_dict['maps'] = torch.stack(cam_dict['maps'])
             import matplotlib.pyplot as plt
-            # stacked = np.reshape(cam_dict['maps'][:,0,:,:], [32*4, 32])
-            # stacked = np.concatenate([input_tensor[0,0,0,:,:], stacked], axis=0)
-            # plt.imshow(stacked)
-            # plt.show()
-            fig, ax = visualizer.saliencymap_to_figure(cam_dict['maps'], input_tensor[0,0,0,:,:])
-            plt.show()
-        visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
-    return visual_prediction
+            visualizer.plot_saliencymap_overview(cams, input_tensor, target_tensor, topk_prob, topk_pred, mean=False)
+        # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
+    pass
 
-
-def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, plot_every, save_every, learning_rate, output_dir, checkpoint_dir):
+def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, log_every, save_every, learning_rate, output_dir, checkpoint_dir):
     plot_losses = []
     print_loss_total = 0
     print_accuracy_total = 0
@@ -323,8 +318,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                           i_batch, (i_batch + 1) / len_of_data * 100,
                           print_loss_avg, print_accuracy_avg), end="\r")
 
-            if (epoch * len_of_data + i_batch) % plot_every == 0:
-                divisor = 1 if (epoch * len_of_data + i_batch) // plot_every == 0 else plot_every
+            if (epoch * len_of_data + i_batch) % log_every == 0:
+                divisor = 1 if (epoch * len_of_data + i_batch) // log_every == 0 else log_every
                 plot_loss_avg = plot_loss_total / divisor
                 plot_loss_total = 0
                 plot_accuracy_avg = plot_accuracy_total / divisor
@@ -359,6 +354,12 @@ network = RecConvNet(
     num_layers=CONFIG['network_depth'], 
     num_targets=CONFIG['classes']
     ).to(device)
+
+
+# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osfmnist2r_ep100.pt', map_location=torch.device('cpu'))
+# network.load_state_dict(state_dict)
+#network.eval()
+#network evaluation, does not work for recurrent models because of BN
 
 
 # input transformation
@@ -430,11 +431,22 @@ test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batch
 output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
 stats_writer = SummaryWriter(output_dir)
 
-trainEpochs(train_loader, test_loader, network, stats_writer, 
-    CONFIG['epochs'], test_every=CONFIG['test_every'], print_every=CONFIG['write_every'], plot_every=CONFIG['write_every'], save_every=5, learning_rate=CONFIG['learning_rate'], output_dir=output_dir, checkpoint_dir=checkpoint_dir)
+trainEpochs(
+        train_loader, test_loader, network, stats_writer, CONFIG['epochs'], test_every=CONFIG['test_every'],
+        print_every=CONFIG['write_every'],
+        log_every=CONFIG['write_every'],
+        save_every=CONFIG['test_every'],
+        learning_rate=CONFIG['learning_rate'],
+        output_dir=output_dir,
+        checkpoint_dir=checkpoint_dir
+    )
 
 
-checkpoint(CONFIG['epochs'], network, checkpoint_dir + 'network', save_every=5)
+checkpoint(
+    CONFIG['epochs'], network, checkpoint_dir + 'network', save_every=CONFIG['test_every']
+    )
+
+# torch.save(network.state_dict(), checkpoint_dir + 'network.model')
 
 # evaluation of network (to be outsourced at some point)
 # -----
