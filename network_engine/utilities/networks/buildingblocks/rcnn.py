@@ -71,44 +71,52 @@ class CAM(nn.Module):
         
     def forward(self, x, topk=3):
         outputs, feature_maps = self.network(x)
-        cam_list = []
+        cams = []
         topk_prob_list = []
         topk_arg_list = []
         b, t, c, h, w = feature_maps.size()
-
+        
+        
         for timestep in range(t):
-            output = outputs[:1,timestep,:]
+            output = outputs[:,timestep,:]
             feature_map = feature_maps[:,timestep,:,:,:]
             
             probs = F.softmax(output, 1)
             prob, args = torch.sort(probs, dim=1, descending=True)
-            
             ## top k class probability
-            topk_prob = prob.squeeze().tolist()[:topk]
-            topk_arg = args.squeeze().tolist()[:topk]
+            topk_prob = prob[:,:topk]
+            topk_arg = args[:,:topk]
+
             # generate class activation map
             feature_map = feature_map.view(b, c, h*w).transpose(1, 2)
-            
             fc_weight = nn.Parameter(self.network.fc.weight.t().unsqueeze(0))
-        
-            cam = torch.bmm(feature_map[:1], fc_weight).transpose(1, 2)
+            fc_weight = fc_weight.repeat(b, 1, 1)
+            cam = torch.bmm(feature_map, fc_weight).transpose(1, 2)
+            
             ## normalize to 0 ~ 1
-            min_val, min_args = torch.min(cam, dim=2, keepdim=True)
-            cam -= min_val
-            max_val, max_args = torch.max(cam, dim=2, keepdim=True)
-            cam /= max_val
+            # this only makes sense when evaluation of one timestep
+            # min_val, min_args = torch.min(cam, dim=2, keepdim=True)
+            # cam -= min_val
+            # max_val, max_args = torch.max(cam, dim=2, keepdim=True)
+            # cam /= max_val
             
             ## top k class activation map
-            topk_cam = cam.view(1, -1, h, w)[0, topk_arg]
-            topk_cam = nn.functional.interpolate(topk_cam.unsqueeze(0), 
-                                            (x.size(3), x.size(4)), mode='bilinear', align_corners=True).squeeze(0)
+            cam = cam.view(b, -1, h, w)
+            topk_cam = []
+            for i in range(b):
+                topk_cam.append(cam[i, topk_arg[i,:],:,:])
+            topk_cam = torch.stack(topk_cam, 0)
+            topk_cam_upsampled = nn.functional.interpolate(topk_cam, 
+                                            (x.size(3), x.size(4)), mode='bilinear', align_corners=True)
             # topk_cam = torch.split(topk_cam, 1)
-            cam_list.append(topk_cam)
+            cams.append(topk_cam_upsampled)
             topk_prob_list.append(topk_prob)
             topk_arg_list.append(topk_arg)
         
-        cam_dict = {'maps':cam_list, 'topk_prob':topk_prob_list, 'topk_arg':topk_arg_list}
-        return outputs, cam_dict
+        cams = torch.stack(cams, dim=1)
+        topk_prob = torch.stack(topk_prob_list, dim=1)
+        topk_arg = torch.stack(topk_arg_list, dim=1)
+        return outputs, (cams, topk_prob, topk_arg)
 
 
 
