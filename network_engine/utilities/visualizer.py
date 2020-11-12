@@ -492,6 +492,7 @@ def show_cam_means(cams, pics, targets, probs, preds):
     """
     b,t,c,h,w = pics.shape
     
+    # topk output
     uber_cam = []
     for timestep in range(t):
         topk_cam = []
@@ -500,7 +501,8 @@ def show_cam_means(cams, pics, targets, probs, preds):
         topk_cam = torch.stack(topk_cam, 0)
         uber_cam.append(topk_cam)
     cams1 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
-        
+    
+    # last predicition evolution
     uber_cam = []
     for timestep in range(t):
         topk_cam = []
@@ -510,7 +512,7 @@ def show_cam_means(cams, pics, targets, probs, preds):
         uber_cam.append(topk_cam)
     cams2 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
     
-    
+    # target evolution
     uber_cam = []
     for timestep in range(t):
         topk_cam = []
@@ -519,7 +521,6 @@ def show_cam_means(cams, pics, targets, probs, preds):
         topk_cam = torch.stack(topk_cam, 0)
         uber_cam.append(topk_cam)
     cams3 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
-        
     
     
     fig, axes = plt.subplots(3,t+1, figsize=(12,12))
