@@ -263,7 +263,8 @@ def test_final(test_loader, network, timesteps, stereo):
             print(topk_pred[0])
             #TODO return this in a tensorboard compatible format
             import matplotlib.pyplot as plt
-            visualizer.plot_saliencymap_overview(cams, input_tensor, target_tensor, topk_prob, topk_pred, mean=False)
+            visualizer.show_cam_samples(cams, input_tensor, target_tensor, topk_prob, topk_pred)
+            visualizer.show_cam_means(cams, input_tensor, target_tensor, topk_prob, topk_pred)
         # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     pass
 
@@ -356,7 +357,7 @@ network = RecConvNet(
     ).to(device)
 
 
-# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osfmnist2r_ep100.pt', map_location=torch.device('cpu'))
+# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osfmnist2c_ep100.pt', map_location=torch.device('cpu'))
 # network.load_state_dict(state_dict)
 #network.eval()
 #network evaluation, does not work for recurrent models because of BN
