@@ -265,6 +265,17 @@ def test_final(test_loader, network, timesteps, stereo):
             import matplotlib.pyplot as plt
             visualizer.show_cam_samples(cams, input_tensor, target_tensor, topk_prob, topk_pred)
             visualizer.show_cam_means(cams, input_tensor, target_tensor, topk_prob, topk_pred)
+            
+            # filter correct predictions - best topk at last timestep = target
+            correct_indices = (target_tensor == topk_pred[:, -1, 0])
+            # show means for correct predictions
+            visualizer.show_cam_means(
+                cams[correct_indices],
+                input_tensor[correct_indices],
+                target_tensor[correct_indices],
+                topk_prob[correct_indices],
+                topk_pred[correct_indices]
+                )
         # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     pass
 
