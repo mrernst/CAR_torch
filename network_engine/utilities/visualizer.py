@@ -392,53 +392,194 @@ def saliencymap_to_figure(smap, pic, alpha=0.5):
 
 #cam_dict = {'maps':cam_list, 'topk_prob':topk_prob_list, 'topk_arg':topk_arg_list}
 
-def plot_saliencymap_overview(cams, pics, targets, probs, preds, alpha=0.5, mean=False):
+def show_cam_samples(cams, pics, targets, probs, preds, alpha=0.5):
     """
-    cams (b,t,topk,h,w)        Class Activation Maps
-    pics (b,t,channels,h,w)    Input Images for Recurrent Network
+    cams (b,t,n_classes,h,w)   Class Activation Maps
+    pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
     targets (b)                Target Vectors
     probs (b,t,topk)           Probabilities for Each output
     preds (b,t,topk)           Predictions of the Network
+    alpha                      Transparency of the heatmap overlay
     """
-    b,t,c,h,w = pics.shape
-    fig, axes = plt.subplots(t,t, figsize=(12,12))
     
-    if mean:
-        cams = cams.mean(0)
-        pics = np.zeros_like(pics.mean(0))
-        targets = 'mult.'
-        probs = probs[0]
-        preds = preds[0]
-        alpha = 1.0
-        
-    else:
-        cams = cams[0]
-        pics = pics[0]
-        targets = targets[0]
-        probs = probs[0]
-        preds = preds[0]
+    from mpl_toolkits.axes_grid1 import make_axes_locatable
+
+    b,t,c,h,w = pics.shape
+    fig, axes = plt.subplots(3,t+1, figsize=(12,12))
+    
+
+    cams = cams[0]
+    pics = pics[0]
+    targets = targets[0]
+    probs = probs[0]
+    preds = preds[0]
     
     for i in range(t):
         axes[0,i].imshow(pics[i,0,:,:], cmap="Greys")
-        axes[0,i].imshow(cams[i,0,:,:], cmap=mpl.cm.jet, alpha=alpha,
+        im = axes[0,i].imshow(cams[i,preds[i,0],:,:], cmap=mpl.cm.jet, alpha=alpha,
               interpolation='nearest')#, vmin=0, vmax=1)
         axes[0,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
-    
-    for i in range(1,t):
-        for j in range(1,i+1):
-            axes[j,i].imshow(pics[i,0,:,:], cmap="Greys")
-            axes[j,i].imshow(cams[i,0,:,:] - cams[i-j,0,:,:], cmap=mpl.cm.seismic, alpha=alpha,
-                  interpolation='nearest')#, vmin=-1, vmax=1)
-            axes[j,i].set_title('t{}-t{}'.format(i,i-j))
-            
-    
-    for j in range(1,t):
-        for i in range(0,j):
-            axes[j,i].axis('off')
+        axes[0,i].axis('off')
+        divider = make_axes_locatable(axes[0,i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        
+    axes[0, -1].imshow(pics[-1,0,:,:], cmap="Greys")
+    im = axes[0, -1].imshow(cams[-1,preds[-1,0],:,:] - cams[0,preds[0,0],:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    axes[0, -1].set_title('Delta t')
+    axes[0, -1].axis('off')
+    divider = make_axes_locatable(axes[0,-1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+
+    for i in range(t):
+        axes[1,i].imshow(pics[i,0,:,:], cmap="Greys")
+        im = axes[1,i].imshow(cams[i,preds[-1,0],:,:], cmap=mpl.cm.jet, alpha=alpha,
+              interpolation='nearest')#, vmin=0, vmax=1)
+        axes[1,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+        axes[1,i].axis('off')
+        divider = make_axes_locatable(axes[1,i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+    axes[1, -1].imshow(pics[-1,0,:,:], cmap="Greys")
+    im = axes[1, -1].imshow(cams[-1,preds[-1,0],:,:] - cams[0,preds[-1,0],:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    axes[1, -1].set_title('Delta t')
+    axes[1, -1].axis('off')
+    divider = make_axes_locatable(axes[1,-1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+
+    for i in range(t):
+        axes[2,i].imshow(pics[i,0,:,:], cmap="Greys")
+        im = axes[2,i].imshow(cams[i,targets,:,:], cmap=mpl.cm.jet, alpha=alpha,
+              interpolation='nearest')#, vmin=0, vmax=1)
+        axes[2,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+        axes[2,i].axis('off')
+        divider = make_axes_locatable(axes[2,i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+    axes[2, -1].imshow(pics[-1,0,:,:], cmap="Greys")
+    im = axes[2, -1].imshow(cams[-1,targets,:,:] - cams[0,targets,:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    axes[2, -1].set_title('Delta t')
+    axes[2, -1].axis('off')
+    divider = make_axes_locatable(axes[2,-1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+
+    # for i in range(1,t):
+    #     for j in range(1,i+1):
+    #         axes[j,i].imshow(pics[i,0,:,:], cmap="Greys")
+    #         axes[j,i].imshow(cams[i,0,:,:] - cams[i-j,0,:,:], cmap=mpl.cm.seismic, alpha=alpha,
+    #               interpolation='nearest')#, vmin=-1, vmax=1)
+    #         axes[j,i].set_title('t{}-t{}'.format(i,i-j))
+    #         
+    # 
+    # for j in range(1,t):
+    #     for i in range(0,j):
+    #         axes[j,i].axis('off')
     
     plt.show()
     pass
 
+def show_cam_means(cams, pics, targets, probs, preds):
+    """
+    cams (b,t,n_classes,h,w)   Class Activation Maps
+    pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
+    targets (b)                Target Vectors
+    probs (b,t,topk)           Probabilities for Each output
+    preds (b,t,topk)           Predictions of the Network
+    alpha                      Transparency of the heatmap overlay
+    """
+    b,t,c,h,w = pics.shape
+    
+    uber_cam = []
+    for timestep in range(t):
+        topk_cam = []
+        for batch in range(b):
+            topk_cam.append(cams[batch, timestep, preds[batch, timestep, 0],:,:])
+        topk_cam = torch.stack(topk_cam, 0)
+        uber_cam.append(topk_cam)
+    cams1 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
+        
+    uber_cam = []
+    for timestep in range(t):
+        topk_cam = []
+        for batch in range(b):
+            topk_cam.append(cams[batch, timestep, preds[batch, -1, 0],:,:])
+        topk_cam = torch.stack(topk_cam, 0)
+        uber_cam.append(topk_cam)
+    cams2 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
+    
+    
+    uber_cam = []
+    for timestep in range(t):
+        topk_cam = []
+        for batch in range(b):
+            topk_cam.append(cams[batch, timestep, targets[batch],:,:])
+        topk_cam = torch.stack(topk_cam, 0)
+        uber_cam.append(topk_cam)
+    cams3 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
+        
+    
+    
+    fig, axes = plt.subplots(3,t+1, figsize=(12,12))
+    
+    
+    cams = cams[0]
+    pics = pics[0]
+    targets = targets[0]
+    probs = probs[0]
+    preds = preds[0]
+    alpha = 1.0
+    
+    for i in range(t):
+        im = axes[0,i].imshow(cams1[i], cmap=mpl.cm.jet, alpha=alpha,
+              interpolation='nearest')#, vmin=0, vmax=1)
+        axes[0,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+        axes[0,i].axis('off')
+        divider = make_axes_locatable(axes[0,i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+        
+    im = axes[0, -1].imshow(cams1[-1] - cams1[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    axes[0, -1].set_title('Delta t')
+    axes[0, -1].axis('off')
+    divider = make_axes_locatable(axes[0,-1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+
+    for i in range(t):
+        im = axes[1,i].imshow(cams2[i], cmap=mpl.cm.jet, alpha=alpha,
+              interpolation='nearest')#, vmin=0, vmax=1)
+        axes[1,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+        axes[1,i].axis('off')
+        divider = make_axes_locatable(axes[1,i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+    im = axes[1, -1].imshow(cams2[-1] - cams2[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    axes[1, -1].set_title('Delta t')
+    axes[1, -1].axis('off')
+    divider = make_axes_locatable(axes[1,-1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+
+    for i in range(t):
+        im = axes[2,i].imshow(cams3[i], cmap=mpl.cm.jet, alpha=alpha,
+              interpolation='nearest')#, vmin=0, vmax=1)
+        axes[2,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+        axes[2,i].axis('off')
+        divider = make_axes_locatable(axes[2,i])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+    im = axes[2, -1].imshow(cams3[-1] - cams3[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    axes[2, -1].set_title('Delta t')
+    axes[2, -1].axis('off')
+    divider = make_axes_locatable(axes[2,-1])
+    cax = divider.append_axes("right", size="5%", pad=0.05)
+    plt.colorbar(im, cax=cax)
+    
+    plt.show()
+    pass
 
 # ---------------------
 # image transformations
