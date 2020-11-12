@@ -248,9 +248,15 @@ def test_final(test_loader, network, timesteps, stereo):
 
     # TODO: Solve the unroll-timestep handling as a function parameter
     #timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
-    
+
     with torch.no_grad():
+        cam_list = []
+        target_list = []
+        topk_prob_list = []
+        topk_pred_list = []
+        
         for i, data in enumerate(test_loader):
+            
             input_tensor, target_tensor = data
             if stereo:
                 input_tensor = torch.cat(input_tensor, dim=1)
@@ -258,24 +264,31 @@ def test_final(test_loader, network, timesteps, stereo):
             input_tensor = input_tensor.unsqueeze(1)
             input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
             
-            outputs, (cams, topk_prob, topk_pred) = cam(input_tensor)
-            print(target_tensor[0])
-            print(topk_pred[0])
-            #TODO return this in a tensorboard compatible format
-            import matplotlib.pyplot as plt
-            visualizer.show_cam_samples(cams, input_tensor, target_tensor, topk_prob, topk_pred)
-            visualizer.show_cam_means(cams, input_tensor, target_tensor, topk_prob, topk_pred)
-            
-            # filter correct predictions - best topk at last timestep = target
-            correct_indices = (target_tensor == topk_pred[:, -1, 0])
-            # show means for correct predictions
-            visualizer.show_cam_means(
-                cams[correct_indices],
-                input_tensor[correct_indices],
-                target_tensor[correct_indices],
-                topk_prob[correct_indices],
-                topk_pred[correct_indices]
-                )
+            outputs, (cams, topk_prob, topk_pred) = cam(input_tensor)            
+            cam_list.append(cams)
+            target_list.append(target_tensor)
+            topk_prob_list.append(topk_prob)
+            topk_pred_list.append(topk_pred)
+        
+        visualizer.show_cam_samples(cams, input_tensor, target_tensor, topk_prob, topk_pred, n_samples=5)
+        # lists to tensors
+        cams = torch.cat(cam_list, dim=0)
+        print(cams.shape)
+        target_tensor = torch.cat(target_list, dim=0)
+        topk_prob = torch.cat(topk_prob_list, dim=0)
+        topk_pred = torch.cat(topk_pred_list, dim=0)
+        
+        visualizer.show_cam_means(cams, target_tensor, topk_prob, topk_pred)
+        
+        # filter correct predictions - best topk at last timestep = target
+        correct_indices = (target_tensor == topk_pred[:, -1, 0])
+        # show means for correct predictions
+        visualizer.show_cam_means(
+            cams[correct_indices],
+            target_tensor[correct_indices],
+            topk_prob[correct_indices],
+            topk_pred[correct_indices]
+            )
         # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     pass
 
@@ -368,10 +381,12 @@ network = RecConvNet(
     ).to(device)
 
 
-# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osfmnist2c_ep100.pt', map_location=torch.device('cpu'))
+# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osfmnist2r_ep100.pt', map_location=torch.device('cpu'))
+# 
+# state_dict = torch.load('/home/mernst/git/titan/experiments/010_osfmnist2r_rcnn_comparison/data/config12/i1/BLT3_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osfmnist2r_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt', map_location=torch.device('cpu'))
+# 
 # network.load_state_dict(state_dict)
-#network.eval()
-#network evaluation, does not work for recurrent models because of BN
+# network.eval() # network evaluation, does not work for recurrent models because of BN
 
 
 # input transformation

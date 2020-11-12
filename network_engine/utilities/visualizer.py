@@ -54,6 +54,8 @@ import re
 import itertools
 from math import sqrt
 import matplotlib.pyplot as plt
+from mpl_toolkits.axes_grid1 import make_axes_locatable
+import sys
 
 
 # ----------------
@@ -143,8 +145,6 @@ def make_cmap(colors, position=None, bit=False):
 
     cmap = mpl.colors.LinearSegmentedColormap('my_colormap', cdict, 256)
     return cmap
-
-
 
 
 
@@ -392,7 +392,7 @@ def saliencymap_to_figure(smap, pic, alpha=0.5):
 
 #cam_dict = {'maps':cam_list, 'topk_prob':topk_prob_list, 'topk_arg':topk_arg_list}
 
-def show_cam_samples(cams, pics, targets, probs, preds, alpha=0.5):
+def show_cam_samples(cams, pics, targets, probs, preds, alpha=0.5, n_samples=5):
     """
     cams (b,t,n_classes,h,w)   Class Activation Maps
     pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
@@ -405,92 +405,106 @@ def show_cam_samples(cams, pics, targets, probs, preds, alpha=0.5):
     from mpl_toolkits.axes_grid1 import make_axes_locatable
 
     b,t,c,h,w = pics.shape
-    fig, axes = plt.subplots(3,t+1, figsize=(12,12))
+   
+    all_cams = cams
+    all_pics = pics
+    all_targets = targets
+    all_probs = probs
+    all_preds = preds
     
-
-    cams = cams[0]
-    pics = pics[0]
-    targets = targets[0]
-    probs = probs[0]
-    preds = preds[0]
-    
-    for i in range(t):
-        axes[0,i].imshow(pics[i,0,:,:], cmap="Greys")
-        im = axes[0,i].imshow(cams[i,preds[i,0],:,:], cmap=mpl.cm.jet, alpha=alpha,
-              interpolation='nearest')#, vmin=0, vmax=1)
-        axes[0,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
-        axes[0,i].axis('off')
-        divider = make_axes_locatable(axes[0,i])
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
+    for n in range(n_samples):
+        fig, axes = plt.subplots(3,t+1, figsize=(12,12))
+        cams = all_cams[n]
+        pics = all_pics[n]
+        targets = all_targets[n]
+        probs = all_probs[n]
+        preds = all_preds[n]
         
-    axes[0, -1].imshow(pics[-1,0,:,:], cmap="Greys")
-    im = axes[0, -1].imshow(cams[-1,preds[-1,0],:,:] - cams[0,preds[0,0],:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
-    axes[0, -1].set_title('Delta t')
-    axes[0, -1].axis('off')
-    divider = make_axes_locatable(axes[0,-1])
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-
-    for i in range(t):
-        axes[1,i].imshow(pics[i,0,:,:], cmap="Greys")
-        im = axes[1,i].imshow(cams[i,preds[-1,0],:,:], cmap=mpl.cm.jet, alpha=alpha,
-              interpolation='nearest')#, vmin=0, vmax=1)
-        axes[1,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
-        axes[1,i].axis('off')
-        divider = make_axes_locatable(axes[1,i])
+        for i in range(t):
+            axes[0,i].imshow(pics[i,0,:,:], cmap="Greys")
+            im = axes[0,i].imshow(cams[i,preds[i,0],:,:], cmap=mpl.cm.jet, alpha=alpha,
+                  interpolation='nearest')#, vmin=0, vmax=1)
+            axes[0,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+            axes[0,i].axis('off')
+            divider = make_axes_locatable(axes[0,i])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+        axes[0, -1].imshow(pics[-1,0,:,:], cmap="Greys")
+        min, max = (cams[-1,preds[-1,0],:,:] - cams[0,preds[0,0],:,:]).min(), (cams[-1,preds[-1,0],:,:] - cams[0,preds[0,0],:,:]).max()
+        # zero_pos = (-min) / (-min + max)
+        # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+        im = axes[0, -1].imshow(cams[-1,preds[-1,0],:,:] - cams[0,preds[0,0],:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
+        axes[0, -1].set_title('Delta t')
+        axes[0, -1].axis('off')
+        divider = make_axes_locatable(axes[0,-1])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-    axes[1, -1].imshow(pics[-1,0,:,:], cmap="Greys")
-    im = axes[1, -1].imshow(cams[-1,preds[-1,0],:,:] - cams[0,preds[-1,0],:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
-    axes[1, -1].set_title('Delta t')
-    axes[1, -1].axis('off')
-    divider = make_axes_locatable(axes[1,-1])
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-
-    for i in range(t):
-        axes[2,i].imshow(pics[i,0,:,:], cmap="Greys")
-        im = axes[2,i].imshow(cams[i,targets,:,:], cmap=mpl.cm.jet, alpha=alpha,
-              interpolation='nearest')#, vmin=0, vmax=1)
-        axes[2,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
-        axes[2,i].axis('off')
-        divider = make_axes_locatable(axes[2,i])
-        cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
-    axes[2, -1].imshow(pics[-1,0,:,:], cmap="Greys")
-    im = axes[2, -1].imshow(cams[-1,targets,:,:] - cams[0,targets,:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
-    axes[2, -1].set_title('Delta t')
-    axes[2, -1].axis('off')
-    divider = make_axes_locatable(axes[2,-1])
-    cax = divider.append_axes("right", size="5%", pad=0.05)
-    plt.colorbar(im, cax=cax)
-
-    # for i in range(1,t):
-    #     for j in range(1,i+1):
-    #         axes[j,i].imshow(pics[i,0,:,:], cmap="Greys")
-    #         axes[j,i].imshow(cams[i,0,:,:] - cams[i-j,0,:,:], cmap=mpl.cm.seismic, alpha=alpha,
-    #               interpolation='nearest')#, vmin=-1, vmax=1)
-    #         axes[j,i].set_title('t{}-t{}'.format(i,i-j))
-    #         
-    # 
-    # for j in range(1,t):
-    #     for i in range(0,j):
-    #         axes[j,i].axis('off')
     
-    plt.show()
+        for i in range(t):
+            axes[1,i].imshow(pics[i,0,:,:], cmap="Greys")
+            im = axes[1,i].imshow(cams[i,preds[-1,0],:,:], cmap=mpl.cm.jet, alpha=alpha,
+                  interpolation='nearest')#, vmin=0, vmax=1)
+            axes[1,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+            axes[1,i].axis('off')
+            divider = make_axes_locatable(axes[1,i])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+        axes[1, -1].imshow(pics[-1,0,:,:], cmap="Greys")
+        min, max = (cams[-1,preds[-1,0],:,:] - cams[0,preds[-1,0],:,:]).min(), (cams[-1,preds[-1,0],:,:] - cams[0,preds[-1,0],:,:]).max()
+        # zero_pos = (-min) / (-min + max)
+        # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+        im = axes[1, -1].imshow(cams[-1,preds[-1,0],:,:] - cams[0,preds[-1,0],:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
+        axes[1, -1].set_title('Delta t')
+        axes[1, -1].axis('off')
+        divider = make_axes_locatable(axes[1,-1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+    
+        for i in range(t):
+            axes[2,i].imshow(pics[i,0,:,:], cmap="Greys")
+            im = axes[2,i].imshow(cams[i,targets,:,:], cmap=mpl.cm.jet, alpha=alpha,
+                  interpolation='nearest')#, vmin=0, vmax=1)
+            axes[2,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
+            axes[2,i].axis('off')
+            divider = make_axes_locatable(axes[2,i])
+            cax = divider.append_axes("right", size="5%", pad=0.05)
+            plt.colorbar(im, cax=cax)
+        axes[2, -1].imshow(pics[-1,0,:,:], cmap="Greys")
+        min, max = (cams[-1,targets,:,:] - cams[0,targets,:,:]).min(), (cams[-1,targets,:,:] - cams[0,targets,:,:]).max()
+        # zero_pos = (-min) / (-min + max)
+        # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+        im = axes[2, -1].imshow(cams[-1,targets,:,:] - cams[0,targets,:,:], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
+        axes[2, -1].set_title('Delta t')
+        axes[2, -1].axis('off')
+        divider = make_axes_locatable(axes[2,-1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        plt.colorbar(im, cax=cax)
+    
+        # for i in range(1,t):
+        #     for j in range(1,i+1):
+        #         axes[j,i].imshow(pics[i,0,:,:], cmap="Greys")
+        #         axes[j,i].imshow(cams[i,0,:,:] - cams[i-j,0,:,:], cmap=mpl.cm.seismic, alpha=alpha,
+        #               interpolation='nearest')#, vmin=-1, vmax=1)
+        #         axes[j,i].set_title('t{}-t{}'.format(i,i-j))
+        #         
+        # 
+        # for j in range(1,t):
+        #     for i in range(0,j):
+        #         axes[j,i].axis('off')
+        
+        plt.show()
     pass
 
-def show_cam_means(cams, pics, targets, probs, preds):
+def show_cam_means(cams, targets, probs, preds):
     """
     cams (b,t,n_classes,h,w)   Class Activation Maps
-    pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
     targets (b)                Target Vectors
     probs (b,t,topk)           Probabilities for Each output
     preds (b,t,topk)           Predictions of the Network
     alpha                      Transparency of the heatmap overlay
     """
-    b,t,c,h,w = pics.shape
+    
+    b,t,n_classes,h,w = cams.shape
     
     # topk output
     uber_cam = []
@@ -527,7 +541,6 @@ def show_cam_means(cams, pics, targets, probs, preds):
     
     
     cams = cams[0]
-    pics = pics[0]
     targets = targets[0]
     probs = probs[0]
     preds = preds[0]
@@ -535,14 +548,17 @@ def show_cam_means(cams, pics, targets, probs, preds):
     
     for i in range(t):
         im = axes[0,i].imshow(cams1[i], cmap=mpl.cm.jet, alpha=alpha,
-              interpolation='nearest')#, vmin=0, vmax=1)
+              interpolation='nearest', vmin=-cams1[i].max(), vmax=cams1[i].max())
         axes[0,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
         axes[0,i].axis('off')
         divider = make_axes_locatable(axes[0,i])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
         
-    im = axes[0, -1].imshow(cams1[-1] - cams1[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    min, max = (cams1[-1] - cams1[0]).min(), (cams1[-1] - cams1[0]).max()
+    # zero_pos = (-min) / (-min + max)
+    # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+    im = axes[0, -1].imshow(cams1[-1] - cams1[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
     axes[0, -1].set_title('Delta t')
     axes[0, -1].axis('off')
     divider = make_axes_locatable(axes[0,-1])
@@ -551,13 +567,16 @@ def show_cam_means(cams, pics, targets, probs, preds):
 
     for i in range(t):
         im = axes[1,i].imshow(cams2[i], cmap=mpl.cm.jet, alpha=alpha,
-              interpolation='nearest')#, vmin=0, vmax=1)
+              interpolation='nearest', vmin=-cams2[i].max(), vmax=cams2[i].max())
         axes[1,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
         axes[1,i].axis('off')
         divider = make_axes_locatable(axes[1,i])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-    im = axes[1, -1].imshow(cams2[-1] - cams2[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    min, max = (cams2[-1] - cams2[0]).min(), (cams2[-1] - cams2[0]).max()
+    # zero_pos = (-min) / (-min + max)
+    # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+    im = axes[1, -1].imshow(cams2[-1] - cams2[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
     axes[1, -1].set_title('Delta t')
     axes[1, -1].axis('off')
     divider = make_axes_locatable(axes[1,-1])
@@ -566,13 +585,16 @@ def show_cam_means(cams, pics, targets, probs, preds):
 
     for i in range(t):
         im = axes[2,i].imshow(cams3[i], cmap=mpl.cm.jet, alpha=alpha,
-              interpolation='nearest')#, vmin=0, vmax=1)
+              interpolation='nearest', vmin=-cams3[i].max(), vmax=cams3[i].max())
         axes[2,i].set_title('t{}: tar/pred ({}/{})'.format(i, targets, preds[i,0]))
         axes[2,i].axis('off')
         divider = make_axes_locatable(axes[2,i])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         plt.colorbar(im, cax=cax)
-    im = axes[2, -1].imshow(cams3[-1] - cams3[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest')
+    min, max = (cams3[-1] - cams3[0]).min(), (cams3[-1] - cams3[0]).max()
+    # zero_pos = (-min) / (-min + max)
+    # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+    im = axes[2, -1].imshow(cams3[-1] - cams3[0], cmap=mpl.cm.seismic, alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
     axes[2, -1].set_title('Delta t')
     axes[2, -1].axis('off')
     divider = make_axes_locatable(axes[2,-1])
