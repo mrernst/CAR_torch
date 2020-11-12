@@ -102,14 +102,16 @@ class CAM(nn.Module):
             
             ## top k class activation map
             cam = cam.view(b, -1, h, w)
-            topk_cam = []
-            for i in range(b):
-                topk_cam.append(cam[i, topk_arg[i,:],:,:])
-            topk_cam = torch.stack(topk_cam, 0)
-            topk_cam_upsampled = nn.functional.interpolate(topk_cam, 
+            
+            # top k sorting should be outsourced to the visualization?
+            # topk_cam = []
+            # for i in range(b):
+            #     topk_cam.append(cam[i, topk_arg[i,:],:,:])
+            # topk_cam = torch.stack(topk_cam, 0)
+            
+            cam_upsampled = nn.functional.interpolate(cam, 
                                             (x.size(3), x.size(4)), mode='bilinear', align_corners=True)
-            # topk_cam = torch.split(topk_cam, 1)
-            cams.append(topk_cam_upsampled)
+            cams.append(cam_upsampled)
             topk_prob_list.append(topk_prob)
             topk_arg_list.append(topk_arg)
         
