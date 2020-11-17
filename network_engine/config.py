@@ -69,12 +69,11 @@ def get_par():
 
     par = {}
 
-    par['exp_name'] = ["osfmnist2r_rcnn_comparison"]
+    par['exp_name'] = ["new_experiment"]
     # par['name'] must be defined as a FLAG to engine, b/c it resembles the
     # iteration number that gets passed by the sbatch script
     # TODO: add documentation i.e. parameter possibilities
-    par['dataset'] = ["osfmnist2r"] #osmnist2 #ycb1_single
-
+    par['dataset'] = ["osmnist2r_reduced"] #osmnist2 #ycb1_single
     par['n_occluders'] = [2] #2
     par['occlusion_percentage'] = [0]
     par['label_type'] = ["onehot"] #["onehot"]
@@ -85,8 +84,8 @@ def get_par():
     par['feature_multiplier'] = [1]
     par['keep_prob'] = [1.0]
 
-    par['stereo'] = [False, True]
-    par['downsampling'] = ['ds4'] #fine
+    par['batchnorm'] = [True]
+    par['stereo'] = [False]
     par['color'] = ['grayscale'] #color
     # par['cropped'] = [False]
     # par['augmented'] = [False]
@@ -128,12 +127,15 @@ def get_aux():
     aux['test_dir'] = [""] # ""
     aux['evaluation_dir'] = [""] # ""
 
-    aux['decaying_lrate'] = [False]
+    aux['lr_decay'] = [True]
+    aux['lr_cosine'] = [False]
+    aux['lr_decay_epochs'] = ['60, 75, 90']
+    aux['lr_decay_rate'] = [0.1]
+    aux['l2_lambda'] = [0.] # 0.0005
+    # old parameters for Spoerer Like decay
     aux['lr_eta'] = [0.1]
     aux['lr_delta'] = [0.1]
     aux['lr_d'] = [40.]
-    aux['l2_lambda'] = [0.]
-    aux['batchnorm'] = [True]
     aux['global_weight_init_mean'] = ['None'] #[1.0, 0.0]
     aux['global_weight_init_std'] = ['None']
     # Info: None-Values have to be strings b/c of csv text conversion
