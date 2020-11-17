@@ -69,38 +69,38 @@ def get_par():
 
     par = {}
 
-    par['exp_name'] = ["mnist_rcnn"]
+    par['exp_name'] = ["osfmnist2r_rcnn_comparison"]
     # par['name'] must be defined as a FLAG to engine, b/c it resembles the
     # iteration number that gets passed by the sbatch script
     # TODO: add documentation i.e. parameter possibilities
-    par['dataset'] = ["mnist"] #osmnist2 #ycb1_single
+    par['dataset'] = ["osfmnist2r"] #osmnist2 #ycb1_single
 
-    par['n_occluders'] = [0] #2
+    par['n_occluders'] = [2] #2
     par['occlusion_percentage'] = [0]
     par['label_type'] = ["onehot"] #["onehot"]
-    par['connectivity'] = ['BLT', 'BL', 'BT']#['B', 'BF', 'BK', 'BT', 'BL', 'BLT'] # ['BD', 'BT', 'BL', 'BLT'] # ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['BLT']
+    par['connectivity'] = ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['B', 'BF', 'BK', 'BT', 'BL', 'BLT'] # ['BD', 'BT', 'BL', 'BLT'] # ['B', 'BF', 'BK', 'BD', 'BT', 'BL', 'BLT'] #['BLT']
     par['BLT_longrange'] = [0]
-    par['time_depth'] = [3, 10, 20]
+    par['time_depth'] = [3]
     par['time_depth_beyond'] = [0]
     par['feature_multiplier'] = [1]
     par['keep_prob'] = [1.0]
 
-    par['stereo'] = [False]
+    par['stereo'] = [False, True]
     par['downsampling'] = ['ds4'] #fine
     par['color'] = ['grayscale'] #color
-    par['cropped'] = [False]
-    par['augmented'] = [False]
+    # par['cropped'] = [False]
+    # par['augmented'] = [False]
 
     par['write_every'] = [100] # 500
-    par['test_every'] = [1] # 5
-    par['buffer_size'] = [60000] #[600000]
+    par['test_every'] = [5] # 5
+    par['buffer_size'] = [600000] #[600000]
     par['verbose'] = [False]
     par['visualization'] = [False] #False
     par['projector'] = [False]
 
     par['batchsize'] = [500] #500
-    par['epochs'] = [25]
-    par['learning_rate'] = [0.003]
+    par['epochs'] = [100]
+    par['learning_rate'] = [0.001]
 
     return par
 
@@ -119,10 +119,9 @@ def get_aux():
     aux = {}
     aux['wdir'] = ["{}titan/".format(PWD_STEM)]
     aux['input_dir'] = ["{}titan/datasets/".format(PWD_STEM)]
-    # aux['input_dir'] = ["/home/aecgroup/aecdata/Textures/occluded/datasets/"]
+    aux['input_dir'] = ["/home/aecgroup/aecdata/Textures/occluded/datasets/"]
     aux['output_dir'] = ["{}titan/experiments/".format(PWD_STEM)]
     # aux['output_dir'] = ["/home/aecgroup/aecdata/Results_python/markus/experiments/"]
-    aux['network_module'] = ["utilities.networks.proto_net"]
     aux['norm_by_stat'] = [False]
     aux['training_dir'] = [""] # "all"
     aux['validation_dir'] = [""] # ""
