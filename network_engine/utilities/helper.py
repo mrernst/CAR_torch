@@ -46,6 +46,7 @@
 # -----
 import torch
 import numpy as np
+import math
 
 import csv
 import os
@@ -329,6 +330,11 @@ def convert_config_types(config_dictionary):
                     ("yes", "true", "t", "1")
             elif 'None' in value:
                 config_dictionary[key] = None
+            elif ',' in value:
+                mult_values = config_dictionary[key].split(',')
+                config_dictionary[key] = list([])
+                for v in mult_values:
+                    config_dictionary[key].append(int(v))
             else:
                 config_dictionary[key] = int(value)
         except(ValueError, TypeError):
@@ -363,7 +369,7 @@ def get_output_directory(configuration_dict, flags):
     else:
         architecture_string += '_bn0'
     architecture_string += '_bs{}'.format(configuration_dict['batchsize'])
-    if configuration_dict['decaying_lrate']:
+    if configuration_dict['lr_decay']:
         architecture_string += '_lr{}-{}-{}'.format(
             configuration_dict['lr_eta'],
             configuration_dict['lr_delta'],
@@ -406,26 +412,30 @@ def get_output_directory(configuration_dict, flags):
     return writer_directory, checkpoint_directory
 
 
+def adjust_learning_rate(learning_rate, cosine, lr_decay_rate, epochs, lr_decay_epochs, optimizer, epoch):
+    lr = learning_rate
+    if cosine:
+        eta_min = lr * (lr_decay_rate ** 3)
+        lr = eta_min + (lr - eta_min) * (
+                1 + math.cos(math.pi * epoch / epochs)) / 2
+    else:
+        steps = np.sum(epoch > np.asarray(lr_decay_epochs))
+        if steps > 0:
+            lr = lr * (lr_decay_rate ** steps)
+            #lr = learning_rate * (lr_decay_rate ** (1/d * epoch)) ?
 
-def compile_list_of_train_summaries():
-    pass
+    for param_group in optimizer.param_groups:
+        param_group['lr'] = lr
 
 
-def compile_list_of_test_summaries():
-    pass
+def warmup_learning_rate(warm, warm_epochs, warmup_from, warmup_to, epoch, batch_id, total_batches, optimizer):
+    if warm and epoch <= warm_epochs:
+        p = (batch_id + (epoch - 1) * total_batches) / \
+            (warm_epochs * total_batches)
+        lr = warmup_from + p * (warmup_to - warmup_from)
 
-
-def compile_list_of_image_summaries():
-    pass
-
-
-def compile_list_of_additional_summaries():
-    pass
-
-
-def get_and_merge_summaries():
-    pass
-
+        for param_group in optimizer.param_groups:
+            param_group['lr'] = lr
 
 # _____________________________________________________________________________
 

@@ -92,17 +92,22 @@ class CAM(nn.Module):
             fc_weight = nn.Parameter(self.network.fc.weight.t().unsqueeze(0))
             fc_weight = fc_weight.repeat(b, 1, 1)
             cam = torch.bmm(feature_map, fc_weight).transpose(1, 2)
-            
             ## normalize to 0 ~ 1
-            # this only makes sense when evaluation of one timestep
+            # this only makes sense when evaluation of one timestep? or at all?
             # min_val, min_args = torch.min(cam, dim=2, keepdim=True)
             # cam -= min_val
             # max_val, max_args = torch.max(cam, dim=2, keepdim=True)
             # cam /= max_val
             
+            
+            # # normalize by standard deviation and mean of the distribution?
+            mean_val = torch.mean(cam, dim=1, keepdim=True)
+            cam -= mean_val
+            max_val, max_args = torch.max(cam, dim=2, keepdim=True)
+            cam /= max_val
+            
             ## top k class activation map
             cam = cam.view(b, -1, h, w)
-            
             # top k sorting should be outsourced to the visualization?
             # topk_cam = []
             # for i in range(b):
@@ -422,65 +427,6 @@ class RecConvNet(nn.Module):
         writer.add_scalar(
             'network/{}/median'.format(name), variable.median(), step)
 
-
-
-
-class B_Network(nn.Module):
-    def __init__(self, kernel=3, filters=32):
-        self.kernel = kernel
-        self.filters = filters
-        super(B_Network, self).__init__()
-        self.conv1 = nn.Conv2d(1, self.filters, self.kernel, padding=1)
-        self.pool1 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn1 = nn.BatchNorm2d(self.filters)
-        self.conv2 = nn.Conv2d(self.filters, self.filters, self.kernel, padding=1)
-        self.pool2 = nn.MaxPool2d(2, 2, padding=0)
-        self.bn2 = nn.BatchNorm2d(self.filters)
-        self.fc1 = nn.Linear(self.filters * 8 * 8, 10)
-        self.lrn = nn.LocalResponseNorm(2, alpha=0.0001, beta=0.75, k=1.0)
-
-    def forward(self, x):
-        x = self.pool1(self.lrn(F.relu(self.bn1(self.conv1(x)))))
-        # print(x.shape)
-        x = self.pool2(self.lrn(F.relu(self.bn2(self.conv2(x)))))
-        # print(x.shape)
-
-        x = x.view(-1, 32 * 8 * 8)
-        # print(x.shape)
-
-        # x = F.softmax(self.fc1(x), 1), softmax is a applied with cross entropy loss!
-        # print(x.shape) AND it should be along dimension 2!!!
-
-        return x
-
-
-
-class Lenet5(nn.Module):
-    def __init__(self):
-        super(StandardCNN, self).__init__()
-        self.conv1 = nn.Conv2d(1, 6, 8, padding=4)
-        self.pool1 = nn.MaxPool2d(4, 2, padding=1)
-        self.bn1 = nn.BatchNorm2d(6)
-        self.conv2 = nn.Conv2d(6, 16, 8, padding=4)
-        self.pool2 = nn.MaxPool2d(4, 2, padding=1)
-        self.bn2 = nn.BatchNorm2d(16)
-        self.fc1 = nn.Linear(16 * 7 * 7, 120)  # 32*6*6
-        self.fc2 = nn.Linear(120, 10)  # 32*6*6
-
-    def forward(self, x):
-        x = self.pool1(F.relu(self.bn1(self.conv1(x))))
-        # print(x.shape)
-        x = self.pool2(F.relu(self.bn2(self.conv2(x))))
-        # print(x.shape)
-
-        x = x.view(-1, 16 * 7 * 7)
-        # print(x.shape)
-
-        x = F.relu(self.fc1(x))
-        # x = F.softmax(self.fc2(x), 1) softmax is a applied with cross entropy loss!
-        # print(x.shape)
-
-        return x
 
 # _____________________________________________________________________________
 

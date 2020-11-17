@@ -269,11 +269,13 @@ def test_final(test_loader, network, timesteps, stereo):
             target_list.append(target_tensor)
             topk_prob_list.append(topk_prob)
             topk_pred_list.append(topk_pred)
+            
+            if i > 50:
+                break
         
         visualizer.show_cam_samples(cams, input_tensor, target_tensor, topk_prob, topk_pred, n_samples=5)
         # lists to tensors
         cams = torch.cat(cam_list, dim=0)
-        print(cams.shape)
         target_tensor = torch.cat(target_list, dim=0)
         topk_prob = torch.cat(topk_prob_list, dim=0)
         topk_pred = torch.cat(topk_pred_list, dim=0)
@@ -292,7 +294,7 @@ def test_final(test_loader, network, timesteps, stereo):
         # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     pass
 
-def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, log_every, save_every, learning_rate, output_dir, checkpoint_dir):
+def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, log_every, save_every, learning_rate, lr_decay, lr_cosine, lr_decay_rate, lr_decay_epochs, weight_decay, output_dir, checkpoint_dir):
     plot_losses = []
     print_loss_total = 0
     print_accuracy_total = 0
@@ -301,7 +303,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     
     len_of_data = len(train_loader)
 
-    optimizer = optim.Adam(network.parameters(), lr=learning_rate)
+    optimizer = optim.Adam(network.parameters(), lr=learning_rate, weight_decay=weight_decay)
     
     criterion = nn.CrossEntropyLoss()
         
@@ -319,8 +321,17 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
             cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
             pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
             writer.add_figure('predictions vs. actuals', vp, epoch)
-            # writer.close()
+            writer.close()
         start = time.time()
+        if lr_decay:
+            helper.adjust_learning_rate(
+                learning_rate,
+                lr_cosine,
+                lr_decay_rate,
+                n_epochs,
+                lr_decay_epochs,
+                optimizer,
+                epoch)
         for i_batch, sample_batched in enumerate(train_loader):
             loss, accuracy = train_recurrent(
                 sample_batched[0], sample_batched[1],
@@ -357,12 +368,24 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                       epoch * len_of_data + i_batch)
                 writer.add_scalar(
                     'training/accuracy', plot_accuracy_avg, epoch * len_of_data + i_batch)
-                # writer.close()
-                
-            
+        writer.close()
+        
         if epoch % save_every == 0:
                 checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
     
+    # final test after training
+    test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch + 1, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+    
+    writer.add_scalar('testing/loss', test_loss,
+                      epoch * len_of_data)
+    writer.add_scalar(
+        'testing/accuracy', test_accurary, epoch * len_of_data)
+    network.log_stats(writer, epoch * len_of_data)
+    
+    cm.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
+    cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
+    pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
+    writer.add_figure('predictions vs. actuals', vp, epoch)
     writer.close()
 
 
@@ -381,12 +404,29 @@ network = RecConvNet(
     ).to(device)
 
 
-# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osfmnist2r_ep100.pt', map_location=torch.device('cpu'))
+
+
+
+# state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osmnist2r_ep100.pt', map_location=torch.device('cpu'))
 # 
-# state_dict = torch.load('/home/mernst/git/titan/experiments/010_osfmnist2r_rcnn_comparison/data/config12/i1/BLT3_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osfmnist2r_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt', map_location=torch.device('cpu'))
+# 
+# BLT3_osfmnist2r = '/home/mernst/git/titan/experiments/010_osfmnist2r_rcnn_comparison/data/config12/i1/BLT3_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osfmnist2r_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt'
+# 
+# BLT3_osfmnist2c = '/home/mernst/git/titan/experiments/009_osfmnist2c_rcnn_comparison/data/config12/i1/BLT3_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osfmnist2c_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt'
+# 
+# BLT3_osmnist2r = '/home/mernst/git/titan/experiments/008_osmnist2r_rcnn_comparison/data/config6/i1/BLT3_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osmnist2r_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt'
+# 
+# BLT3_osmnist2c = '/home/mernst/git/titan/experiments/007_osmnist2c_rcnn_comparison/data/config6/i1/BLT3_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osmnist2c_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt'
+# 
+# B_osmnist2r = '/home/mernst/git/titan/experiments/008_osmnist2r_rcnn_comparison/data/config0/i1/B0_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osmnist2r_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt'
+# 
+# B_osfmnist2r = '/home/mernst/git/titan/experiments/010_osfmnist2r_rcnn_comparison/data/config0/i1/B0_2l_fm1_d1.0_l20.0_bn1_bs500_lr0.001/osfmnist2r_2occ_Xp/32x32x1_grayscale_onehot/checkpoints/networkmodel_epoch_100.pt'
+# 
+# 
+# # state_dict = torch.load(BLT3_osmnist2c, map_location=torch.device('cpu'))
 # 
 # network.load_state_dict(state_dict)
-# network.eval() # network evaluation, does not work for recurrent models because of BN
+# # network.eval() # network evaluation, does not work for recurrent models because of BN
 
 
 # input transformation
@@ -464,6 +504,11 @@ trainEpochs(
         log_every=CONFIG['write_every'],
         save_every=CONFIG['test_every'],
         learning_rate=CONFIG['learning_rate'],
+        lr_decay=CONFIG['lr_decay'],
+        lr_cosine=CONFIG['lr_cosine'], 
+        lr_decay_rate=CONFIG['lr_decay_rate'],
+        lr_decay_epochs=CONFIG['lr_decay_epochs'],
+        weight_decay=CONFIG['l2_lambda'],
         output_dir=output_dir,
         checkpoint_dir=checkpoint_dir
     )
