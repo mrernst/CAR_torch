@@ -374,18 +374,18 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
                 checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
     
     # final test after training
-    test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch + 1, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+    test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, n_epochs, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
     
     writer.add_scalar('testing/loss', test_loss,
-                      epoch * len_of_data)
+                      n_epochs * len_of_data)
     writer.add_scalar(
-        'testing/accuracy', test_accurary, epoch * len_of_data)
-    network.log_stats(writer, epoch * len_of_data)
+        'testing/accuracy', test_accurary, n_epochs * len_of_data)
+    network.log_stats(writer, n_epochs * len_of_data)
     
-    cm.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
+    cm.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
     cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
-    pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
-    writer.add_figure('predictions vs. actuals', vp, epoch)
+    pr.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
+    writer.add_figure('predictions vs. actuals', vp, n_epochs)
     writer.close()
 
 
