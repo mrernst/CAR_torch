@@ -67,10 +67,10 @@ import math
 
 # custom functions
 # -----
+import utilities.afterburner as afterburner
 import utilities.helper as helper
 import utilities.visualizer as visualizer
 from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
-
 from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder
 
 
@@ -154,8 +154,12 @@ def checkpoint(epoch, model, optimizer, ckpt_dir, save_every, remove_last=True):
 
     print("[INFO] Checkpoint saved to {}".format(ckpt_out_path, end='\n'))
     if (epoch > 0 and remove_last):
-        os.remove(ckpt_dir +
+        try:
+            os.remove(ckpt_dir +
                   "checkpoint_epoch_{}.pt".format(epoch - save_every))
+        except(FileNotFoundError):
+            print('[INFO] ' +
+                  "checkpoint_epoch_{}.pt could not be found/deleted".format(epoch - save_every))
 
 
 def load_checkpoint(model, optimizer, ckpt_dir):
@@ -191,7 +195,6 @@ def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion, 
         input_tensor = torch.cat(input_tensor, dim=1)
     input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
     loss = 0
-    # TODO: Solve the timestep handling as a function parameter
     input_tensor = input_tensor.unsqueeze(1)
     input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
     outputs, _ = network(input_tensor)
@@ -226,11 +229,11 @@ def test_recurrent(test_loader, network, criterion, epoch, timesteps, stereo):
             input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
             
             outputs, _ = network(input_tensor)
+            topv, topi = outputs[:,-1,:].topk(1)
+            # other timesteps?
             for t in range(outputs.shape[1]):
-                loss += criterion(outputs[:,t,:], target_tensor)
-            loss /= test_loader.batch_size
-            # outputs at other timesteps?
-            topv, topi = outputs[:,t,:].topk(1)
+                loss += criterion(outputs[:,t,:], target_tensor) / topi.shape[0]
+
             accuracy += (topi == target_tensor.unsqueeze(1)).sum(
                 dim=0, dtype=torch.float64) / topi.shape[0]
             
@@ -248,7 +251,13 @@ def test_recurrent(test_loader, network, criterion, epoch, timesteps, stereo):
     return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
 
 
-def test_final(test_loader, network, timesteps, stereo):
+def evaluate_recurrent(test_loader, network, criterion, timesteps, stereo):
+    evaluation_data = None
+    embedding_data = None
+    return evaluation_data, embedding_data
+
+
+def test_cams(test_loader, network, timesteps, stereo):
     
     cam = CAM(network)
     loss = 0
@@ -325,7 +334,7 @@ def trainEpochs(train_loader, test_loader, network, optimizer, criterion, writer
             network.log_stats(writer, epoch * len_of_data)
             
             cm.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
-            cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
+            #cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
             pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
             writer.add_figure('predictions vs. actuals', vp, epoch)
             writer.close()
@@ -381,20 +390,21 @@ def trainEpochs(train_loader, test_loader, network, optimizer, criterion, writer
         if epoch % save_every == 0:
                 checkpoint(epoch, network, optimizer, checkpoint_dir + 'network', save_every)
     
-    # final test after training
-    test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, n_epochs, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
-    
-    writer.add_scalar('testing/loss', test_loss,
-                      n_epochs * len_of_data)
-    writer.add_scalar(
-        'testing/accuracy', test_accurary, n_epochs * len_of_data)
-    network.log_stats(writer, n_epochs * len_of_data)
-    
-    cm.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
-    cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
-    pr.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
-    writer.add_figure('predictions vs. actuals', vp, n_epochs)
-    writer.close()
+    if start_epoch < n_epochs:
+        # final test after training; do not test if restarting from the same epoch
+        test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, n_epochs, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+        
+        writer.add_scalar('testing/loss', test_loss,
+                          n_epochs * len_of_data)
+        writer.add_scalar(
+            'testing/accuracy', test_accurary, n_epochs * len_of_data)
+        network.log_stats(writer, n_epochs * len_of_data)
+        
+        cm.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
+        cm.print_misclassified_objects(CONFIG['class_encoding'], 5)
+        pr.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
+        writer.add_figure('predictions vs. actuals', vp, n_epochs)
+        writer.close()
     
     checkpoint(n_epochs, network, optimizer, checkpoint_dir + 'network', save_every)
 
@@ -522,12 +532,24 @@ trainEpochs(
     )
 
 
-# evaluation of network (to be outsourced at some point)
+
+# evaluation and afterburner
 # -----
 
-# redefine model
-# torch.load model
-# evaluate network
+evaluation_data, embedding_data = evaluate_recurrent(test_loader, network, criterion, CONFIG['time_depth'] + 1, CONFIG['stereo'])
+
+essence = afterburner.DataEssence()
+essence.distill(path=output_dir, evaluation_data=evaluation_data,
+                embedding_data=None)  # embedding_data (save space)
+essence.write_to_file(filename=CONFIG['output_dir'] +
+                      FLAGS.config_file.split('/')[-1].split('.')[0] +
+                      '{}'.format(FLAGS.name) + '.pkl')
+essence.plot_essentials(CONFIG['output_dir'].rsplit('/', 2)[0] +
+                        '/visualization/' +
+                        FLAGS.config_file.split('/')[-1].split('.')[0] +
+                        '{}'.format(FLAGS.name) + '.pdf')
+
+
 
 # _____________________________________________________________________________
 
