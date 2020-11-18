@@ -87,36 +87,6 @@ def timeSince(since, percent):
     rs = es - s
     return '%s ( - %s)' % (asMinutes(s), asMinutes(rs))
 
-
-def showPlot(points):
-    plt.figure()
-    fig, ax = plt.subplots()
-    loc = ticker.MultipleLocator(base=0.2)
-    ax.yaxis.set_major_locator(loc)
-    plt.plot(points)
-
-def matplotlib_imshow(img, one_channel=False, cmap='Greys'):
-    fig = plt.figure()
-    ax = fig.add_subplot(111)
-    if one_channel:
-        img = img.mean(dim=0)
-    img = img / 2 + 0.5
-    npimg = img.numpy()
-    if one_channel:
-        return (fig, ax, ax.imshow(npimg, cmap=cmap))
-    else:
-        return (fig, ax, ax.imshow(np.transpose(npimg, (1,2,0))))
-
-
-def checkpoint(epoch, model, experiment_dir, save_every, remove_last=True):
-    model_out_path = experiment_dir + "model_epoch_{}.pt".format(epoch)
-    torch.save(model.state_dict(), model_out_path)
-    print("[Info:] Checkpoint saved to {}".format(model_out_path, end='\n'))
-    if (epoch > 0 and remove_last):
-        os.remove(experiment_dir +
-                  "model_epoch_{}.pt".format(epoch - save_every))
-
-
 # cross-platform development
 
 from platform import system
@@ -169,8 +139,49 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 
 
 # -----------------
-# Functions for Training, Testing and Evaluation
+# Functions for Checkpointing, Training, Testing and Evaluation
 # -----------------
+
+def checkpoint(epoch, model, optimizer, ckpt_dir, save_every, remove_last=True):
+    # write dict with model and optimizer parameters
+    state = {
+        'epoch': epoch + 1, 'state_dict': model.state_dict(),
+        'optimizer': optimizer.state_dict(),
+    }
+    ckpt_out_path = ckpt_dir + "checkpoint_epoch_{}.pt".format(epoch)
+    #torch.save(model.state_dict(), model_out_path)
+    torch.save(state, ckpt_out_path)
+
+    print("[INFO] Checkpoint saved to {}".format(ckpt_out_path, end='\n'))
+    if (epoch > 0 and remove_last):
+        os.remove(ckpt_dir +
+                  "checkpoint_epoch_{}.pt".format(epoch - save_every))
+
+
+def load_checkpoint(model, optimizer, ckpt_dir):
+    # Note: Input model & optimizer should be pre-defined.  This routine only updates their states.
+    start_epoch = 0
+    
+    def sort_key(string):
+        return int(string.split('.')[0].split('_')[-1])
+    
+    
+    list_of_ckpts = [f for f in os.listdir(ckpt_dir) if '.pt' in f]
+    list_of_ckpts.sort(key=sort_key, reverse=True)
+    
+    if len(list_of_ckpts) > 0:
+        final_checkpoint = list_of_ckpts[0]
+        # print("[INFO] loading checkpoint '{}'".format(final_checkpoint))
+        checkpoint = torch.load(os.path.join(ckpt_dir, final_checkpoint), map_location=device)
+        start_epoch = checkpoint['epoch']
+        model.load_state_dict(checkpoint['state_dict'])
+        optimizer.load_state_dict(checkpoint['optimizer'])
+        print("[INFO] loaded checkpoint '{}' (continue: epoch {})"
+                  .format(final_checkpoint, checkpoint['epoch']))
+    else:
+        print("[INFO] no checkpoint found at '{}'".format(ckpt_dir))
+
+    return model, optimizer, start_epoch
 
 
 def train_recurrent(input_tensor, target_tensor, network, optimizer, criterion, timesteps, stereo):
@@ -294,7 +305,7 @@ def test_final(test_loader, network, timesteps, stereo):
         # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     pass
 
-def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every, print_every, log_every, save_every, learning_rate, lr_decay, lr_cosine, lr_decay_rate, lr_decay_epochs, weight_decay, output_dir, checkpoint_dir):
+def trainEpochs(train_loader, test_loader, network, optimizer, criterion, writer, start_epoch, n_epochs, test_every, print_every, log_every, save_every, learning_rate, lr_decay, lr_cosine, lr_decay_rate, lr_decay_epochs, output_dir, checkpoint_dir):
     plot_losses = []
     print_loss_total = 0
     print_accuracy_total = 0
@@ -302,12 +313,8 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     plot_accuracy_total = 0
     
     len_of_data = len(train_loader)
-
-    optimizer = optim.Adam(network.parameters(), lr=learning_rate, weight_decay=weight_decay)
-    
-    criterion = nn.CrossEntropyLoss()
         
-    for epoch in range(n_epochs):
+    for epoch in range(start_epoch, n_epochs):
         if epoch % test_every == 0:
             test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, epoch, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
             
@@ -322,6 +329,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
             pr.to_tensorboard(writer, CONFIG['class_encoding'], epoch)
             writer.add_figure('predictions vs. actuals', vp, epoch)
             writer.close()
+            
         start = time.time()
         if lr_decay:
             helper.adjust_learning_rate(
@@ -371,7 +379,7 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
         writer.close()
         
         if epoch % save_every == 0:
-                checkpoint(epoch, network, checkpoint_dir + 'network', save_every)
+                checkpoint(epoch, network, optimizer, checkpoint_dir + 'network', save_every)
     
     # final test after training
     test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, n_epochs, CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
@@ -387,25 +395,13 @@ def trainEpochs(train_loader, test_loader, network, writer, n_epochs, test_every
     pr.to_tensorboard(writer, CONFIG['class_encoding'], n_epochs)
     writer.add_figure('predictions vs. actuals', vp, n_epochs)
     writer.close()
+    
+    checkpoint(n_epochs, network, optimizer, checkpoint_dir + 'network', save_every)
 
 
 # -----------------
-# Main Training Loop
+# Main Program
 # -----------------
-
-# configure network
-
-network = RecConvNet(
-    CONFIG['connectivity'],
-    kernel_size=CONFIG['kernel_size'], input_channels=CONFIG['image_channels'],
-    n_features=CONFIG['n_features'],
-    num_layers=CONFIG['network_depth'], 
-    num_targets=CONFIG['classes']
-    ).to(device)
-
-
-
-
 
 # state_dict = torch.load('/Users/markus/Research/Code/titan/datasets/BLT3_osmnist2r_ep100.pt', map_location=torch.device('cpu'))
 # 
@@ -475,31 +471,44 @@ except:
         transform=test_transform
         )
 
-# MNIST for testing
-# train_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=True, download=True, transform=transforms.Compose([
-#            transforms.CenterCrop(32),
-#            transforms.ToTensor(),
-#            transforms.Normalize((0.,), (1.,)),
-#        ]))
-#     
-# test_dataset = datasets.MNIST(root=CONFIG['input_dir'] + '/dynaMO/data/mnist/', train=False, transform=transforms.Compose([
-#            transforms.CenterCrop(32),
-#            transforms.ToTensor(),
-#            transforms.Normalize((0.,), (1.,)),
-#        ]))
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=4)
 
 test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=4)
 
 
-
-
 output_dir, checkpoint_dir = helper.get_output_directory(CONFIG, FLAGS)
 stats_writer = SummaryWriter(output_dir)
 
+
+# configure network
+network = RecConvNet(
+    CONFIG['connectivity'],
+    kernel_size=CONFIG['kernel_size'], input_channels=CONFIG['image_channels'],
+    n_features=CONFIG['n_features'],
+    num_layers=CONFIG['network_depth'], 
+    num_targets=CONFIG['classes']
+    )
+
+optimizer = optim.Adam(network.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['l2_lambda'])
+
+criterion = nn.CrossEntropyLoss()
+
+if FLAGS.restore_ckpt:
+    network, optimizer, start_epoch = load_checkpoint(network, optimizer, checkpoint_dir)
+else:
+    start_epoch = 0
+
+network, criterion = network.to(device), criterion.to(device)
+
+# training loop
+
 trainEpochs(
-        train_loader, test_loader, network, stats_writer, CONFIG['epochs'], test_every=CONFIG['test_every'],
+        train_loader, test_loader, network, optimizer, criterion,
+        writer=stats_writer,
+        start_epoch=start_epoch,
+        n_epochs=CONFIG['epochs'],
+        test_every=CONFIG['test_every'],
         print_every=CONFIG['write_every'],
         log_every=CONFIG['write_every'],
         save_every=CONFIG['test_every'],
@@ -508,17 +517,10 @@ trainEpochs(
         lr_cosine=CONFIG['lr_cosine'], 
         lr_decay_rate=CONFIG['lr_decay_rate'],
         lr_decay_epochs=CONFIG['lr_decay_epochs'],
-        weight_decay=CONFIG['l2_lambda'],
         output_dir=output_dir,
         checkpoint_dir=checkpoint_dir
     )
 
-
-checkpoint(
-    CONFIG['epochs'], network, checkpoint_dir + 'network', save_every=CONFIG['test_every']
-    )
-
-# torch.save(network.state_dict(), checkpoint_dir + 'network.model')
 
 # evaluation of network (to be outsourced at some point)
 # -----
