@@ -174,7 +174,7 @@ class DataEssence(object):
 
 	def plot_essentials(self, savefile):
 		# start figure
-		fig, axes = plt.subplots(4, 3, sharex='all', figsize=[7, 9])
+		fig, axes = plt.subplots(3, 3, sharex='all', figsize=[7, 7])
 		# plot images onto figure
 		self._plot_traintest_lcurve(axes)
 		# self._plot_timebased_lcurve(axes) # TODO: not functional for TITAN
@@ -252,7 +252,7 @@ class DataEssence(object):
 			[key for key in sorted_list_of_keys if '_weights' in key]
 		sorted_list_of_keys.sort()
 		# for i in range(len(sorted_list_of_keys)):
-		for i, ax in enumerate(fig.axes[6:]):
+		for i, ax in enumerate(fig.axes[3:]):
 			if i < len(sorted_list_of_keys):
 				ax.plot(
 					self.essence['network']['step'].tolist(),
@@ -296,7 +296,7 @@ class DataEssence(object):
 					sorted_list_of_keys[i])
 		pass
 
-	# TODO: write these visualizer functions
+	# TODO: write these visualizer functions / look at the ICANN code for inspiration
 	def visualize_softmax_output(self):
 		pass
 
@@ -375,7 +375,7 @@ class EssenceCollection(object):
 
 			for it, iteration in enumerate(list_of_iterations):
 				data[it, 0, j] = 1 - \
-					self.collection[configuration][iteration]['testing']['testtime/partial_accuracy'].values[-1]
+					self.collection[configuration][iteration]['testing']['testing/accuracy'].values[-1]
 				mcnemar_data[it, 0, j] = \
 					self.collection[configuration][iteration]['evaluation']['boolean_classification']
 
@@ -388,8 +388,9 @@ class EssenceCollection(object):
 		# -----
 		print((means).round(3))
 		print((stderror).round(3))
-
-		fig, ax = plt.subplots(figsize=[8.0 / 6 * n_groups, 6.0])
+		fig_width = 8.0 / 6 * n_groups if n_groups > 4 else 6.0
+		fig_height = 6.0
+		fig, ax = plt.subplots(figsize=[fig_width, fig_height])
 
 		index = np.arange(n_groups)
 		bar_width = 0.8
@@ -484,7 +485,10 @@ class EssenceCollection(object):
 							b = mcnemar_table[mcnemar_table == 2.].shape[0]
 							c = mcnemar_table[mcnemar_table == -1.].shape[0]
 							d = mcnemar_table[mcnemar_table == 0].shape[0]
-							chi_sq = ((b - c)**2) / (b + c)
+							try:
+								chi_sq = ((b - c)**2) / (b + c)
+							except(ZeroDivisionError):
+								chi_sq = 1.
 						# stats.chi2.pdf(chi_sq , 1) #
 						pval[k, j] = 1 - stats.chi2.cdf(chi_sq, 1)
 						chi_table[k, j] = chi_sq
@@ -515,13 +519,15 @@ class EssenceCollection(object):
 			ax.tick_params(labelbottom='on', labeltop='off',
 						   top='off', right='off')
 			# ax.set_yticklabels(, fontsize=8)#fontsize=65)
-			ax.set_xlim([-0.5, n_groups * n_bars - 1 - 0.5])
-			ax.set_ylim([n_groups * n_bars - 0.5, -0.5 + 1])
+			# ax.set_xlim([-0.5, n_groups * n_bars - 1 - 0.5])
+			# ax.set_ylim([n_groups * n_bars - 0.5, -0.5 + 1])
+			ax.set_xlim([-0.5, n_groups * n_bars - 0.5])
+			ax.set_ylim([n_groups * n_bars - 0.5, -0.5 ])
 			ax.spines['top'].set_visible(False)
 			ax.spines['right'].set_visible(False)
 
-			ax.axhline(y=2.5, xmin=-0.5, xmax=2.5, color='white', linewidth=1)
-			ax.axvline(x=2.5, ymin=-0.5, ymax=2.5, color='white', linewidth=1)
+			#ax.axhline(y=2.5, xmin=-0.5, xmax=2.5, color='white', linewidth=1)
+			#ax.axvline(x=2.5, ymin=-0.5, ymax=2.5, color='white', linewidth=1)
 			for vertices in vertexlist:
 				pc = collections.PolyCollection(
 					(vertices,), color='white', edgecolor="none")
@@ -529,8 +535,8 @@ class EssenceCollection(object):
 
 			ax.add_patch(Rectangle((-2.5, 6.9), 1, 1, fill='black',
 								   color='black', alpha=1, clip_on=False))
-			ax.text(-2.5, 9.4, 'Significant difference \n(two-sided McNemar \
-				test, \nexpected FDR=0.05)',
+			ax.text(-2.5, 9.4, 'Significant difference \n(two-sided McNemar ' + \
+				'test, \nexpected FDR=0.05)',
 					fontsize=8, horizontalalignment='left',
 					verticalalignment='center')
 			# plt.show()
@@ -538,18 +544,19 @@ class EssenceCollection(object):
 
 			fig, ax = plt.subplots(figsize=(12, 12))
 			ax.matshow(significance_table, cmap='Greys')
-			# ax.set_xticklabels(
-			#     [''] + [arch[:-1] for arch in ARCHARRAY], fontsize=65)
+			ax.set_xticklabels([arch for arch in list_of_configurations], fontsize=65)
 			ax.tick_params(labelbottom='on', labeltop='off',
 						   top='off', right='off')
-			# ax.set_yticklabels(
-			#     [arch[:-1] for arch in ARCHARRAY], fontsize=65)
-			ax.set_xlim([-0.5, n_groups * n_bars - 1 - 0.5])
-			ax.set_ylim([n_groups * n_bars - 0.5, -0.5 + 1])
+			ax.set_yticklabels(
+			    [arch for arch in list_of_configurations], fontsize=65)
+			# ax.set_xlim([-0.5, n_groups * n_bars - 1 - 0.5])
+			# ax.set_ylim([n_groups * n_bars - 0.5, -0.5 + 1])
+			ax.set_xlim([-0.5, n_groups * n_bars - 0.5])
+			ax.set_ylim([n_groups * n_bars - 0.5, -0.5 ])
 			ax.spines['top'].set_visible(False)
 			ax.spines['right'].set_visible(False)
-			ax.axhline(y=2.5, xmin=-0.5, xmax=2.5, color='white')
-			ax.axvline(x=2.5, ymin=-0.5, ymax=2.5, color='white')
+			#ax.axhline(y=2.5, xmin=-0.5, xmax=2.5, color='white')
+			#ax.axvline(x=2.5, ymin=-0.5, ymax=2.5, color='white')
 			for vertices in vertexlist:
 				pc = collections.PolyCollection(
 					(vertices,), color='white', edgecolor="none")
@@ -563,14 +570,14 @@ class EssenceCollection(object):
 
 
 if __name__ == "__main__":
-	import argparse
-	parser = argparse.ArgumentParser()
-	parser.add_argument("-c", "--config", type=str)
-	
-	args = parser.parse_args()
+	# import argparse
+	# parser = argparse.ArgumentParser()
+	# parser.add_argument("-c", "--config", type=str)
+	# 
+	# args = parser.parse_args()
 	
 	print('[INFO] afterburner running, collecting data')
-	ess_coll = EssenceCollection(remove_files=True)
+	ess_coll = EssenceCollection(remove_files=False) # TODO: Change back to True once this works reliably
 
 	ess_coll._plot_barplot_comparison(
 		ess_coll.path_to_experiment +

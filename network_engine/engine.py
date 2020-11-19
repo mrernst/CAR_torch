@@ -53,7 +53,7 @@ from torch import optim
 # for MNIST
 from torchvision import utils, datasets
 
-from torch.utils.data import Dataset, DataLoader
+from torch.utils.data import Dataset, DataLoader, Subset
 from torch.utils.tensorboard import SummaryWriter
 import torchvision
 import torchvision.transforms as transforms
@@ -119,7 +119,7 @@ parser.add_argument(
      "-n",
      "--name",
      type=str,
-     default='',
+     default='i1',
      help='name of the run, i.e. iteration1')
 parser.add_argument(
      "-r",
@@ -152,14 +152,16 @@ def checkpoint(epoch, model, optimizer, ckpt_dir, save_every, remove_last=True):
     #torch.save(model.state_dict(), model_out_path)
     torch.save(state, ckpt_out_path)
 
-    print("[INFO] Checkpoint saved to {}".format(ckpt_out_path, end='\n'))
+    #print("[INFO] Checkpoint saved to {}".format(ckpt_out_path, end='\n'))
+    #print("[INFO] Checkpoint saved.".format(ckpt_out_path, end='\n'))
+
     if (epoch > 0 and remove_last):
         try:
             os.remove(ckpt_dir +
                   "checkpoint_epoch_{}.pt".format(epoch - save_every))
         except(FileNotFoundError):
             print('[INFO] ' +
-                  "checkpoint_epoch_{}.pt could not be found/deleted".format(epoch - save_every))
+                  "Old checkpoint_epoch_{}.pt could not be found/deleted".format(epoch - save_every))
 
 
 def load_checkpoint(model, optimizer, ckpt_dir):
@@ -175,15 +177,16 @@ def load_checkpoint(model, optimizer, ckpt_dir):
     
     if len(list_of_ckpts) > 0:
         final_checkpoint = list_of_ckpts[0]
-        # print("[INFO] loading checkpoint '{}'".format(final_checkpoint))
         checkpoint = torch.load(os.path.join(ckpt_dir, final_checkpoint), map_location=device)
         start_epoch = checkpoint['epoch']
         model.load_state_dict(checkpoint['state_dict'])
         optimizer.load_state_dict(checkpoint['optimizer'])
-        print("[INFO] loaded checkpoint '{}' (continue: epoch {})"
+        print("[INFO] Loaded checkpoint '{}' (continue: epoch {})"
                   .format(final_checkpoint, checkpoint['epoch']))
     else:
-        print("[INFO] no checkpoint found at '{}'".format(ckpt_dir))
+        #print("[INFO] No checkpoint found at '{}'".format(ckpt_dir))
+        print("[INFO] No checkpoint found, starting from scratch")
+
 
     return model, optimizer, start_epoch
 
@@ -251,9 +254,61 @@ def test_recurrent(test_loader, network, criterion, epoch, timesteps, stereo):
     return loss /(i+1), accuracy/(i+1), confusion_matrix, precision_recall, visual_prediction
 
 
-def evaluate_recurrent(test_loader, network, criterion, timesteps, stereo):
-    evaluation_data = None
-    embedding_data = None
+def evaluate_recurrent(dataset, network, batch_size, criterion, timesteps, stereo, projector=False):
+    # create a random but deterministic order for the dataset (important for bc)
+    torch.manual_seed(1234)
+    shuffled_dataset = Subset(dataset, torch.randperm(len(dataset)).tolist())
+    eval_loader = DataLoader(shuffled_dataset, batch_size=batch_size, num_workers=4, shuffle=False)
+    
+    def show(img):
+        import matplotlib.pyplot as plt
+        npimg = img.numpy()
+        plt.imshow(np.transpose(npimg, (1,2,0)), interpolation='nearest')
+        plt.show()
+    
+    loss = 0
+    accuracy = 0
+    list_of_output_tensors = []
+    list_of_bc_values = []
+    
+
+    
+    with torch.no_grad():
+        for i, data in enumerate(eval_loader):
+            input_tensor, target_tensor = data
+            if stereo:
+                input_tensor = torch.cat(input_tensor, dim=1)
+            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
+            # Show a grid of images
+            # show(torchvision.utils.make_grid(input_tensor, padding=8))
+            input_tensor = input_tensor.unsqueeze(1)
+            input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
+            
+            outputs, _ = network(input_tensor)
+            topv, topi = outputs[:,-1,:].topk(1)
+            # other timesteps?
+            for t in range(outputs.shape[1]):
+                loss += criterion(outputs[:,t,:], target_tensor) / topi.shape[0]
+            
+            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
+                dim=0, dtype=torch.float64) / topi.shape[0]
+            
+            list_of_bc_values.append(torch.eq(
+                torch.argmax(outputs[:,-1,:], 1),
+                target_tensor))
+            list_of_output_tensors.append(F.softmax(outputs, dim=-1))
+    
+        bc_values = torch.cat(list_of_bc_values, 0).type(torch.int8)
+        output_values = torch.cat(list_of_output_tensors, 0)
+        
+        print(" " * 80 + "\r" + '[Evaluation:] E%d: %.4f %.4f' % (-1,
+           loss /(i+1), accuracy/(i+1)), end="\n")
+        
+    evaluation_data = \
+    {'boolean_classification': np.array(bc_values),
+     'softmax_output': np.array(output_values)}    
+    
+    embedding_data = None # TODO implement at some point
     return evaluation_data, embedding_data
 
 
@@ -451,35 +506,53 @@ else:
     ])
     test_transform = train_transform
 
-# Datasets LMDB Style
-try:
-    train_dataset = StereoImageFolderLMDB(
-        db_path=CONFIG['input_dir'] + '/{}/{}_train.lmdb'.format(CONFIG['dataset'], CONFIG['dataset']),
-        stereo=CONFIG['stereo'],
-        transform=train_transform
-        )
-    
-    test_dataset = StereoImageFolderLMDB(
-        db_path=CONFIG['input_dir'] + '/{}/{}_test.lmdb'.format(CONFIG['dataset'], CONFIG['dataset']),
-        stereo=CONFIG['stereo'],
-        transform=test_transform
-        )
-except:
-    print('[INFO] No LMDB-file available, using standard folder instead')
-    # Datasets direct import
-    train_dataset = StereoImageFolder(
-        root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
-        train=True,
-        stereo=CONFIG['stereo'],
-        transform=train_transform
-        )
+
+if CONFIG['dataset'] == 'mnist':
+    train_dataset = datasets.MNIST(root=CONFIG['input_dir'], train=True,
+    transform=transforms.Compose([
+        transforms.CenterCrop(32),
+        transforms.ToTensor(),
+        transforms.Normalize((0.,), (1.,))
+    ,]),
+    download=True)
+    test_dataset = datasets.MNIST(root=CONFIG['input_dir'], train=False,
+    transform=transforms.Compose([
+        transforms.CenterCrop(32),
+        transforms.ToTensor(),
+        transforms.Normalize((0.,), (1.,))
+    ,]),
+    download=True)
+else:
+    # Datasets LMDB Style
+    try:
+        train_dataset = StereoImageFolderLMDB(
+            db_path=CONFIG['input_dir'] + '/{}/{}_train.lmdb'.format(CONFIG['dataset'], CONFIG['dataset']),
+            stereo=CONFIG['stereo'],
+            transform=train_transform
+            )
         
-    test_dataset = StereoImageFolder(
-        root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
-        train=False,
-        stereo=CONFIG['stereo'],
-        transform=test_transform
-        )
+        test_dataset = StereoImageFolderLMDB(
+            db_path=CONFIG['input_dir'] + '/{}/{}_test.lmdb'.format(CONFIG['dataset'], CONFIG['dataset']),
+            stereo=CONFIG['stereo'],
+            transform=test_transform
+            )
+    except:
+        print('[INFO] No LMDB-file available, using standard folder instead')
+        # Datasets direct import
+        train_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
+            train=True,
+            stereo=CONFIG['stereo'],
+            transform=train_transform
+            )
+            
+        test_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
+            train=False,
+            stereo=CONFIG['stereo'],
+            transform=test_transform
+            )
+
 
 
 train_loader = torch.utils.data.DataLoader(train_dataset, batch_size=CONFIG['batchsize'], shuffle=True, num_workers=4)
@@ -536,7 +609,7 @@ trainEpochs(
 # evaluation and afterburner
 # -----
 
-evaluation_data, embedding_data = evaluate_recurrent(test_loader, network, criterion, CONFIG['time_depth'] + 1, CONFIG['stereo'])
+evaluation_data, embedding_data = evaluate_recurrent(test_dataset, network, CONFIG['batchsize'], criterion, CONFIG['time_depth'] + 1, CONFIG['stereo'])
 
 essence = afterburner.DataEssence()
 essence.distill(path=output_dir, evaluation_data=evaluation_data,
