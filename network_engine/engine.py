@@ -571,18 +571,17 @@ network = RecConvNet(
     n_features=CONFIG['n_features'],
     num_layers=CONFIG['network_depth'], 
     num_targets=CONFIG['classes']
-    )
+    ).to(device)
+
+criterion = nn.CrossEntropyLoss().to(device)
 
 optimizer = optim.Adam(network.parameters(), lr=CONFIG['learning_rate'], weight_decay=CONFIG['l2_lambda'])
-
-criterion = nn.CrossEntropyLoss()
 
 if FLAGS.restore_ckpt:
     network, optimizer, start_epoch = load_checkpoint(network, optimizer, checkpoint_dir)
 else:
     start_epoch = 0
 
-network, criterion = network.to(device), criterion.to(device)
 
 # training loop
 
