@@ -305,8 +305,8 @@ def evaluate_recurrent(dataset, network, batch_size, criterion, timesteps, stere
            loss /(i+1), accuracy/(i+1)), end="\n")
         
     evaluation_data = \
-    {'boolean_classification': np.array(bc_values),
-     'softmax_output': np.array(output_values)}    
+    {'boolean_classification': np.array(bc_values.cpu()),
+     'softmax_output': np.array(output_values.cpu())}    
     
     embedding_data = None # TODO implement at some point
     return evaluation_data, embedding_data
