@@ -47,15 +47,18 @@
 import torch
 import numpy as np
 
-from PIL import Image
-from textwrap import wrap
-import matplotlib as mpl
+import sys
 import re
 import itertools
-from math import sqrt
+import matplotlib as mpl
 import matplotlib.pyplot as plt
 from mpl_toolkits.axes_grid1 import make_axes_locatable
-import sys
+
+import scipy.optimize as opt
+from PIL import Image
+from textwrap import wrap
+from math import sqrt
+
 
 
 # ----------------
