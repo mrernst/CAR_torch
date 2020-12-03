@@ -370,10 +370,17 @@ def get_output_directory(configuration_dict, flags):
         architecture_string += '_bn0'
     architecture_string += '_bs{}'.format(configuration_dict['batchsize'])
     if configuration_dict['lr_decay']:
-        architecture_string += '_lr{}-{}-{}'.format(
-            configuration_dict['lr_eta'],
-            configuration_dict['lr_delta'],
-            configuration_dict['lr_d'])
+        if configuration_dict['lr_cosine']:
+            architecture_string += '_lr{}-{}-{}'.format(
+                configuration_dict['learning_rate'],
+                configuration_dict['lr_decay_rate'],
+                'cos')
+        else:
+            architecture_string += '_lr{}-{}-{}'.format(
+                configuration_dict['learning_rate'],
+                configuration_dict['lr_decay_rate'],
+                str(configuration_dict['lr_decay_epochs']).strip(
+                    '[]').replace(', ', ','))
     else:
         architecture_string += '_lr{}'.format(
             configuration_dict['learning_rate'])
