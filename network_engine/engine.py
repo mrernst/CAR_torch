@@ -355,6 +355,7 @@ def test_cams(test_loader, network, timesteps, stereo):
         topk_prob = torch.cat(topk_prob_list, dim=0)
         topk_pred = torch.cat(topk_pred_list, dim=0)
         
+        # return cams, target_tensor, topk_prob, topk_pred
         visualizer.show_cam_means(cams, target_tensor, topk_prob, topk_pred)
         
         # filter correct predictions - best topk at last timestep = target
@@ -486,8 +487,7 @@ def trainEpochs(train_loader, test_loader, network, optimizer, criterion, writer
 # 
 # # state_dict = torch.load(BLT3_osmnist2c, map_location=torch.device('cpu'))
 # 
-# network.load_state_dict(state_dict)
-# # network.eval() # network evaluation, does not work for recurrent models because of BN
+
 
 
 # input transformation
@@ -572,6 +572,9 @@ network = RecConvNet(
     num_layers=CONFIG['network_depth'], 
     num_targets=CONFIG['classes']
     ).to(device)
+
+# network.load_state_dict(state_dict)
+# network.eval() # network evaluation, does not work for recurrent models because of BN
 
 criterion = nn.CrossEntropyLoss().to(device)
 
