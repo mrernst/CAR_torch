@@ -174,7 +174,8 @@ class StereoImageFolder(Dataset):
 			transform (callable, optional): Optional transform to be applied
 				on a sample.
 		"""
-		self.root_dir = root_dir + '/train/left/' if train else root_dir + '/test/left/'
+
+		self.train = train
 		self.transform = transform
 		self.target_transform = target_transform
 		self.paths_to_left_samples = []
@@ -185,13 +186,17 @@ class StereoImageFolder(Dataset):
 		self.stereo = stereo
 		
 		# move through the filestructure to get a list of all images
-		uberclasses = os.listdir(self.root_dir)
+		self._add_data(root_dir)
+
+	def _add_data(self, root_dir):
+		root_dir = root_dir + '/train/left/' if self.train else root_dir + '/test/left/'
+		objectclasses = os.listdir(root_dir)
 		try:
-			uberclasses.remove('.DS_Store')
+			objectclasses.remove('.DS_Store')
 		except(ValueError):
 			pass
-		for cla in uberclasses:
-			class_folder = os.path.join(self.root_dir, cla)
+		for cla in objectclasses:
+			class_folder = os.path.join(root_dir, cla)
 
 			filenames = os.listdir(class_folder)
 			try:
@@ -200,12 +205,12 @@ class StereoImageFolder(Dataset):
 				pass
 			for name in filenames:
 				self.paths_to_left_samples.append(
-					os.path.join(self.root_dir, cla, name))
+					os.path.join(root_dir, cla, name))
 					
 		
 		for item in self.paths_to_left_samples:
 			self.paths_to_right_samples.append(item.split('left')[0] + 'right' + item.split('left')[1])
-
+	
 	def __len__(self):
 		return len(self.paths_to_left_samples)
 

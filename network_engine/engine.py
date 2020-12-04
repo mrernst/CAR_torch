@@ -522,6 +522,45 @@ if CONFIG['dataset'] == 'mnist':
         transforms.Normalize((0.,), (1.,))
     ,]),
     download=True)
+elif CONFIG['dataset'] == 'osycb2':
+    print('[INFO] No LMDB-file available, using standard folder instead')
+    if CONFIG['occlusion_percentage'] == 0:
+        train_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}/{}'.format(CONFIG['dataset'], 20),
+            train=True,
+            stereo=CONFIG['stereo'],
+            transform=train_transform
+            )
+            
+        test_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}/{}'.format(CONFIG['dataset'], 20),
+            train=False,
+            stereo=CONFIG['stereo'],
+            transform=test_transform
+            )
+        
+        for percentage in [40,60,80]:
+            train_dataset._add_data(CONFIG['input_dir'] + '/{}/{}'.format(CONFIG['dataset'], percentage))
+            test_dataset._add_data(CONFIG['input_dir'] + '/{}/{}'.format(CONFIG['dataset'], percentage))
+    else:
+        train_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}/{}'.format(CONFIG['dataset'], CONFIG['occlusion_percentage']),
+            train=True,
+            stereo=CONFIG['stereo'],
+            transform=train_transform
+            )
+            
+        test_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}/{}'.format(CONFIG['dataset'], CONFIG['occlusion_percentage']),
+            train=False,
+            stereo=CONFIG['stereo'],
+            transform=test_transform
+            )
+    print(len(train_dataset) + len(test_dataset))
+    print(len(train_dataset))
+    print(len(test_dataset))
+    print(test_dataset.paths_to_left_samples)
+    raise NotImplementedError("osycb2 is not yet implemented")
 else:
     # Datasets LMDB Style
     try:
