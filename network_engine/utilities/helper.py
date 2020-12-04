@@ -133,8 +133,8 @@ def infer_additional_parameters(configuration_dict):
     # read the number of layers from the network file
 
     if ('ycb' in configuration_dict['dataset']):
-        configuration_dict['image_height'] = 240
-        configuration_dict['image_width'] = 320
+        configuration_dict['image_height'] = 32
+        configuration_dict['image_width'] = 32
         configuration_dict['image_channels'] = 3
         configuration_dict['classes'] = 79
         configuration_dict['class_encoding'] = np.array([
@@ -218,12 +218,6 @@ def infer_additional_parameters(configuration_dict):
             '002_master_chef_can',
             '077_rubiks_cube'
         ])
-        if configuration_dict['downsampling'] == 'ds2':
-            configuration_dict['image_height'] //= 2
-            configuration_dict['image_width'] //= 2
-        elif configuration_dict['downsampling'] == 'ds4':
-            configuration_dict['image_height'] //= 4
-            configuration_dict['image_width'] //= 4
     elif (('mnist' in configuration_dict['dataset']) and
           not('os' in configuration_dict['dataset'])):
         configuration_dict['image_height'] = 28
