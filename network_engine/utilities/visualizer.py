@@ -348,8 +348,8 @@ def plot_classes_preds(output, images, labels, classes):
         ax = fig.add_subplot(5, 5, idx+1, xticks=[], yticks=[])
         img = images[idx]
         if stereo:
-            img = img.view(1,channels//2,height*2,width)
-        if one_channel:
+            img = img.view(channels//2,height*2,width)
+        elif one_channel:
             img = img.mean(dim=0)
         img = img / 2 + 0.5     # unnormalize
         npimg = img.numpy()
