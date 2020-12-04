@@ -351,9 +351,8 @@ def plot_classes_preds(output, images, labels, classes):
             img = img.view(channels//2,height*2,width)
         elif one_channel:
             img = img.mean(dim=0)
-        img = img / 2 + 0.5     # unnormalize
+            img = img / 2 + 0.5     # unnormalize
         npimg = img.numpy()
-        print(npimg.shape)
 
         if one_channel:
             if len(npimg.shape) > 2:

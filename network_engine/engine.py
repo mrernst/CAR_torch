@@ -556,9 +556,6 @@ elif CONFIG['dataset'] == 'osycb2':
             stereo=CONFIG['stereo'],
             transform=test_transform
             )
-    print(len(train_dataset) + len(test_dataset))
-    print(len(train_dataset))
-    print(len(test_dataset))
 
     #raise NotImplementedError("osycb2 is not yet implemented")
 else:
