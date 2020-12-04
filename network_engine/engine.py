@@ -559,8 +559,8 @@ elif CONFIG['dataset'] == 'osycb2':
     print(len(train_dataset) + len(test_dataset))
     print(len(train_dataset))
     print(len(test_dataset))
-    print(test_dataset.paths_to_left_samples[:25])
-    print(test_dataset.paths_to_left_samples[25:])
+    print(test_dataset.paths_to_left_samples[:5])
+    print(test_dataset.paths_to_left_samples[-5:])
 
     raise NotImplementedError("osycb2 is not yet implemented")
 else:
