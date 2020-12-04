@@ -348,7 +348,9 @@ def plot_classes_preds(output, images, labels, classes):
         ax = fig.add_subplot(5, 5, idx+1, xticks=[], yticks=[])
         img = images[idx]
         if stereo:
-            img = img.view(channels//2,height*2,width)
+            #img = img.view(channels//2,height*2,width)
+            img1, img2 = torch.split(img, channels//2)
+            img = torch.cat([img1,img2], dim=1)
         elif one_channel:
             img = img.mean(dim=0)
             img = img / 2 + 0.5     # unnormalize
