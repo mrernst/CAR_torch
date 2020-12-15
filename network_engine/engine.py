@@ -74,6 +74,9 @@ from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
 from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder
 
 
+def worker_init_fn(worker_id):                                                          
+    np.random.seed(np.random.get_state()[1][0] + worker_id)
+
 def asMinutes(s):
     m = math.floor(s / 60)
     s -= m * 60
@@ -312,14 +315,14 @@ def evaluate_recurrent(dataset, network, batch_size, criterion, timesteps, stere
     return evaluation_data, embedding_data
 
 
-def test_cams(test_loader, network, timesteps, stereo):
+def show_class_activation(test_loader, network, timesteps, stereo):
     
     cam = CAM(network)
     loss = 0
     accuracy = 0
     
-    confusion_matrix = visualizer.ConfusionMatrix(n_cls=network.fc.out_features)
-    precision_recall = visualizer.PrecisionRecall(n_cls=network.fc.out_features)
+    # confusion_matrix = visualizer.ConfusionMatrix(n_cls=network.fc.out_features)
+    # precision_recall = visualizer.PrecisionRecall(n_cls=network.fc.out_features)
 
     # TODO: Solve the unroll-timestep handling as a function parameter
     #timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
@@ -369,6 +372,42 @@ def test_cams(test_loader, network, timesteps, stereo):
             )
         # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
     pass
+
+
+def extract_hidden_representation(test_loader, network, timesteps, stereo):
+    loss = 0
+    accuracy = 0
+    feature_list = []
+    input_list = []
+    target_list = []
+    classification_list = []
+    with torch.no_grad():
+        for i, data in enumerate(test_loader):
+            input_tensor, target_tensor = data
+            if stereo:
+                input_tensor = torch.cat(input_tensor, dim=1)
+            input_tensor, target_tensor = input_tensor.to(device), target_tensor.to(device)
+            input_tensor = input_tensor.unsqueeze(1)
+            input_tensor = input_tensor.repeat(1, timesteps, 1, 1, 1)
+            
+            outputs, features = network(input_tensor)
+            # get features after GAP
+            features = features.mean(dim=[-2,-1], keepdim=True) #global average pooling
+
+            topv, topi = outputs[:,-1,:].topk(1)
+            accuracy += (topi == target_tensor.unsqueeze(1)).sum(
+                dim=0, dtype=torch.float64) / topi.shape[0]
+            
+            feature_list.append(features)
+            input_list.append(input_tensor)
+            target_list.append(target_tensor)
+            classification_list.append(topi.view(topi.shape[0]))
+        features = torch.cat(feature_list, dim=0)
+        inputs = torch.cat(input_list, dim=0)
+        targets = torch.cat(target_list, dim=0)
+        classification = torch.cat(classification_list, dim=0)
+    return features, inputs, targets
+
 
 def trainEpochs(train_loader, test_loader, network, optimizer, criterion, writer, start_epoch, n_epochs, test_every, print_every, log_every, save_every, learning_rate, lr_decay, lr_cosine, lr_decay_rate, lr_decay_epochs, output_dir, checkpoint_dir):
     plot_losses = []
@@ -556,8 +595,6 @@ elif CONFIG['dataset'] == 'osycb2':
             stereo=CONFIG['stereo'],
             transform=test_transform
             )
-
-    #raise NotImplementedError("osycb2 is not yet implemented")
 else:
     # Datasets LMDB Style
     try:
@@ -609,8 +646,6 @@ network = RecConvNet(
     num_targets=CONFIG['classes']
     ).to(device)
 
-# network.load_state_dict(state_dict)
-# network.eval() # network evaluation, does not work for recurrent models because of BN
 
 criterion = nn.CrossEntropyLoss().to(device)
 
@@ -621,6 +656,27 @@ if FLAGS.restore_ckpt:
 else:
     start_epoch = 0
 
+
+# -----------------
+# sketch pad for evaluation
+# -----------------
+
+if FLAGS.testrun:    
+    network, optimizer, start_epoch = load_checkpoint(network, optimizer, '/Users/markus/Research/Code/titan/trained_models/')
+    
+    SIZE = 1000
+    test_dataset._add_data('../datasets/vae_mnist_targets/')
+    rep_sample = list(np.random.choice(range(len(test_dataset)-10), size=SIZE-10, replace=False)) + list(range(len(test_dataset)-10, len(test_dataset)))
+    test_dataset = torch.utils.data.Subset(test_dataset, rep_sample)
+    
+    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
+    
+    test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, CONFIG['epochs'], CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+
+
+    feat, img, tar = extract_hidden_representation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
+    visualizer.plot_tsne_timetrajectories2(feat, img, tar, overwrite=True)
+    sys.exit()
 
 # training loop
 
