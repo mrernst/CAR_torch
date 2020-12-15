@@ -211,6 +211,15 @@ class StereoImageFolder(Dataset):
 		for item in self.paths_to_left_samples:
 			self.paths_to_right_samples.append(item.split('left')[0] + 'right' + item.split('left')[1])
 	
+	def _remove_data(self, n_samples, last_samples=True):
+		for i in range(n_samples):
+			if last_samples:
+				self.paths_to_left_samples.pop()
+				self.paths_to_right_samples.pop()
+			else:
+				self.paths_to_left_samples.pop(0)
+				self.paths_to_right_samples.pop(0)
+	
 	def __len__(self):
 		return len(self.paths_to_left_samples)
 
