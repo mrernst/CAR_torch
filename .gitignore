@@ -43,8 +43,8 @@ osmnist2r_reduced
 # Directories that will be filled by data /3rd party tools
 experiments/*
 trained_models/*
-utilities/tsne/*
-utilities/vae/*
+network_engine/utilities/tsne/*
+network_engine/utilities/vae/*
 
 # change in future
 datasets/os*
