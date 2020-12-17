@@ -40,10 +40,12 @@ tfrecord_files
 data
 osmnist2r_reduced
 
-# Directories that will be filled by code
+# Directories that will be filled by data /3rd party tools
 experiments/*
+trained_models/*
 utilities/tsne/*
+utilities/vae/*
 
 # change in future
 datasets/os*
-datasets/BLT*
+datasets/vae*
