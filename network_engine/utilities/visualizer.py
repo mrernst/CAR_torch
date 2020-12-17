@@ -45,6 +45,7 @@
 # standard libraries
 # -----
 import torch
+import torch.nn.functional as F
 import numpy as np
 
 import sys, os, re
@@ -68,6 +69,9 @@ from math import sqrt
 # van der Maaten TSNE implementations
 import utilities.tsne.bhtsne as bhtsne
 import utilities.tsne.tsne as tsne
+
+import utilities.distancemetrics as distancemetrics
+
 
 
 
@@ -166,7 +170,11 @@ def make_cmap(colors, position=None, bit=False):
 
 # helper function to make markers
 def makeMarker(image, zoom=.65):
-    return offsetbox.OffsetImage(image,zoom=zoom, cmap='Greys_r')
+    """
+    makeMarker takes an image (height, weight) numpy array and optionally a zoom factor
+    and returns a matplotlib offsetbox containing an image for plotting
+    """
+    return offsetbox.OffsetImage(image,zoom=zoom, cmap='Greys')
 
 class ImageAnnotations3D():
     def __init__(self, xyz, imgs, ax3d,ax2d):
@@ -194,15 +202,19 @@ class ImageAnnotations3D():
         self.funcmap[event.name](event)
 
     def proj(self, X):
-        """ From a 3D point in axes ax1, 
-            calculate position in 2D in ax2 """
+        """
+        From a 3D point in axes ax1, 
+        calculate position in 2D in ax2 
+        """
         x,y,z = X
         x2, y2, _ = proj3d.proj_transform(x,y,z, self.ax3d.get_proj())
         tr = self.ax3d.transData.transform((x2, y2))
         return self.ax2d.transData.inverted().transform(tr)
 
     def image(self,arr,xy):
-        """ Place an image (arr) as annotation at position xy """
+        """
+        Place an image (arr) as annotation at position xy
+        """
         im = offsetbox.OffsetImage(arr, zoom=0.5)
         im.image.axes = self.ax3d
         ab = offsetbox.AnnotationBbox(im, xy, xybox=(-30., 30.),
@@ -221,11 +233,11 @@ class ImageAnnotations3D():
 
 
 
-
-
 class ConfusionMatrix(object):
-        """Holds and updates a confusion matrix given the networks
-        outputs"""
+        """
+        Holds and updates a confusion matrix object given the networks
+        outputs
+        """
         def __init__(self, n_cls):
             self.n_cls = n_cls
             self.reset()
@@ -335,7 +347,9 @@ class ConfusionMatrix(object):
 
 
 class PrecisionRecall(object):
-    """Holds and updates values for precision and recall"""
+    """
+    Holds and updates values for precision and recall object
+    """
     def __init__(self, n_cls):
         self.n_cls = n_cls
         self.reset()
@@ -883,25 +897,21 @@ def plot_tsne_timetrajectories(representations, imgs, targets, points=1000, show
 
     pass
     
-def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, show_stimuli=True, show_indices=True, N=10, savefile='./../trained_models/tsnesave', overwrite=False):
+def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show_indices=False, N='all', savefile='./../trained_models/tsnesave', overwrite=False):
     
+    # hack to mitigate output
+    from matplotlib.axes._axes import _log as matplotlib_axes_logger
+    matplotlib_axes_logger.setLevel('ERROR')
+    
+     
     # Constants, maybe become variables later
-    N_UNOCC = 10
-    
-    # reduce dataset for plotting
-    representations = representations[-points:]
-    targets = targets[-points:]
-    imgs = imgs[-points:]
+    N_UNOCC = 1000
     
     targets = targets.numpy()
-    
-    markers = ["o","v","s","D","H"]
-    classes = [0,1,2,3,4,5,6,7,8,9] #set(targets.numpy())
-    
+    classes = [0,1,2,3,4,5,6,7,8,9]    
 
-    
-    # plotting
-    markersizes = [10,30] #,10,30]
+    markers = ["o","v","s","D","H"]
+    markersizes = [10,10] #[10,30]
     alpha=1.0
     colors = sns.color_palette("colorblind", len(classes))
     points,time,feature,height,width = representations.shape
@@ -910,9 +920,11 @@ def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, sho
     representations = representations.view(points,time,-1)
     
 
+    # learn tsne embedding
+    # -----
     
-    # new way where we calculate tsne for each timestep seperately
-    # restore or save tsne model
+    
+    # we calculate tsne for each timestep seperately
     if os.path.exists(savefile + '.npy'):
         projection = np.load(savefile + '.npy')
         print('[INFO] Loaded tsne-file at {}'.format(savefile))
@@ -924,11 +936,12 @@ def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, sho
             time_rep = representations[:,ti,:].numpy()
             projected_data = bhtsne.run_bh_tsne(time_rep, no_dims=2, perplexity=25, verbose=True, use_pca=False, initial_dims=time_rep[-1], max_iter=1000) #10000
             projection[:,ti,:] = projected_data
+        np.save(savefile + '.npy', projection)
+        np.save(savefile + '_targets.npy', targets)
     else:
         targets = np.load(savefile + '_targets.npy')
         
-        np.save(savefile + '.npy', projection)
-        np.save(savefile + '_targets.npy', targets)
+
     
     projected_data = projection
     
@@ -940,31 +953,49 @@ def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, sho
     y_data_u = projected_data[-N_UNOCC:,:,1] # (index, time)
     tar_u = targets[-N_UNOCC:]
     
+    # calculate unoccluded centroids
+    
+    x_data_uc = np.zeros([len(classes),time])
+    y_data_uc = np.zeros([len(classes), time])
+    tar_uc = np.zeros(len(classes))
+    for ti in range(time): 
+        for (i, cla) in enumerate(classes):
+            x_data_uc[i,ti] = np.mean([p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla])
+            y_data_uc[i,ti]= np.mean([p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla])
+            tar_uc[i] = cla
     
     
-    for i, t in enumerate(tar_u):
-        print(t)
-        plt.imshow(imgs[-N_UNOCC+i][0,0,:,:])
-        plt.show()
+    # show images for sanity check    
+    # for i, t in enumerate(tar_u[-10:]):
+    #     print(t)
+    #     plt.imshow(imgs[-N_UNOCC+i][0,0,:,:])
+    #     plt.show()
+    # 
     
+    # plot of last timestep
+    # fig, ax = plt.subplots(figsize=(9,6))
+    # for (i, cla) in enumerate(classes):
+    #     xc = [p for (j,p) in enumerate(x_data[:,-1]) if tar[j]==cla]
+    #     yc = [p for (j,p) in enumerate(y_data[:,-1]) if tar[j]==cla]
+    #     ax.scatter(xc,yc,c=colors[i], label=str(int(cla)), marker=markers[3], alpha=alpha, s=markersizes[0])
+    # plt.show()
+
+
+    # start of the top plots
+    # -----
     
+    # shift data according to timestep
     x_spread = x_data.std()
     for ti in range(time):
         x_data[:,ti] = x_data[:,ti] + ti * x_spread*6
         x_data_u[:,ti] = x_data_u[:,ti] + ti * x_spread*6
+        x_data_uc[:,ti] = x_data_uc[:,ti] + ti * x_spread*6
+
 
     
-    fig, ax = plt.subplots(figsize=(9,6))
-    for (i, cla) in enumerate(classes):
-        xc = [p for (j,p) in enumerate(x_data[:,-1]) if tar[j]==cla]
-        yc = [p for (j,p) in enumerate(y_data[:,-1]) if tar[j]==cla]
-        ax.scatter(xc,yc,c=colors[i], label=str(int(cla)), marker=markers[3], alpha=alpha, s=markersizes[0])
-    plt.show()
-
-
-    fig, axes = plt.subplots(2,2, sharex=False, sharey=False, figsize=(9,6))
+    fig, axes = plt.subplots(2,2, sharex=False, sharey=False, figsize=(18,6))
     for pltnr, ax in enumerate([axes[0,0],axes[0,1]]):
-        for ti in range(time): #range(4) #[0,3]
+        for ti in range(time):
             for (i, cla) in enumerate(classes):
                 xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
                 yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
@@ -973,29 +1004,29 @@ def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, sho
         
         ax.scatter([0], [0], c='white', label=' ')
     
-        # unoccluded trajectories
-        for ti in range(time): 
-            for (i,cla) in enumerate(sorted((set(tar_u)))):
-                xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
-                yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
-                ax.scatter(xc,yc,c=colors[i], marker=markers[ti], alpha=alpha, s=markersizes[pltnr], edgecolor='black', label='$t_{}$'.format(ti))
-        # for i in range(N_UNOCC):
-        #     ax.plot(x_data_u[i,:], y_data_u[i,:], color='black', linestyle='-', alpha=alpha)
+    # only second plot gets the unoccluded markers
+    # unoccluded trajectories
+    for ti in range(time): 
+        for (i, cla) in enumerate(classes):
+            xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
+            ax.scatter(xc,yc,c=colors[i], marker=markers[ti], alpha=alpha, s=markersizes[pltnr], edgecolor='black', label='$t_{}$'.format(ti))
     
-    # bottom plots
+    # start of the bottom plots
+    # -----
+    
     grays = ['lightgray'] * len(classes)
     fills = ['none'] * len(classes)
-    
-    colorset = [sns.color_palette(grays),sns.color_palette(grays)]
+    colorset = [sns.color_palette("colorblind", len(classes)), sns.color_palette(grays)]
     marker_fills = [fills,fills]
-    allhighlights = [[3,8],[9]] # TODO: find out what this does!
+    allhighlights = [[3,8],[9]]
+    
     for pltnr in range(len(allhighlights)):
         for hl in allhighlights[pltnr]:
             colorset[pltnr][hl] = colors[hl]
             marker_fills[pltnr][hl] = 'full'
     
-    for pltnr,ax in enumerate([axes[1,0],axes[1,1]]):
-        
+    for pltnr,ax in enumerate([axes[1,0],axes[1,1]]):       
         if N=='all':
             n_indices = range(len(projected_data))
         elif isinstance(N, int):
@@ -1042,48 +1073,46 @@ def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, sho
                     artists.append(ax.add_artist(ab))
                     # if i == 622:
                     #   artists.append(ax.add_artist(ab2))
-                
-        for ti in range(time): #[0,3]: #range(4)
-            for (i, cla) in enumerate(classes):
-                xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
-                yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
-                ax.scatter(xc,yc,c=colorset[pltnr][i], label=str(int(cla)), marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][i]), alpha=alpha, s=markersizes[0])
-                
-        ax.scatter([0], [0], c='white', label=' ')
+    
+    ax, pltnr = axes[1,0], 0
+    for ti in range(time):
+        for (i, cla) in enumerate(classes):
+            # rest of the data
+            xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][i], label=str(int(cla)), marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][i]), alpha=alpha, s=markersizes[0])
+            # unoccluded centroids
+            xc = [p for (j,p) in enumerate(x_data_uc[:,ti]) if tar_uc[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data_uc[:,ti]) if tar_uc[j]==cla]
+            ax.scatter(xc,yc,c=colors[i], marker=markers[ti], alpha=alpha, s=markersizes[pltnr], edgecolor='black', label='$t_{}$'.format(ti))
+
+    
+            # for i in allhighlights[pltnr]:
+            #     xd = x_data_u[i,:]
+            #     yd = y_data_u[i,:]
+            #     for j in range(len(xd)):
+            #         ax.scatter(xd[j],yd[j],c='black', marker=markers[j], alpha=alpha, s=markersizes[0],
+            #         zorder=9999)
         
-        # unoccluded trajectories
-        for ti in range(time): 
-            for (i,cla) in enumerate(sorted((set(tar_u)))):
-                xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
-                yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
-                ax.scatter(xc,yc,c='lightgray', marker=markers[ti], alpha=alpha, s=markersizes[0], label='$t_{}$'.format(ti)) #label='${}_{}$'.format(cla[0],cla[1])
-        # for i in range(N_UNOCC):
-        #     ax.plot(x_data_u[i,:], y_data_u[i,:], color='lightgray', linestyle='-', alpha=alpha)
-        
-        # plot unoccluded trajectories as highlights
-        for ti in range(time):
-            for (i,cla) in enumerate(sorted((set(tar_u)))):
-                xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
-                yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
-                ax.scatter(xc,yc,c='lightgray', marker=markers[ti], alpha=alpha, s=markersizes[0])
-        
-        for i in allhighlights[pltnr]:
-            xd = x_data_u[i,:]
-            yd = y_data_u[i,:]
-            # ax.plot(xd, yd, color='black', linestyle='-', alpha=alpha)
-            for j in range(len(xd)):
-                ax.scatter(xd[j],yd[j],c='black', marker=markers[j], alpha=alpha, s=markersizes[0],
-                zorder=9999)
+    ax, pltnr = axes[1,1], 1
+    for ti in range(time):
+        for (i, cla) in enumerate(classes):
+            # unoccluded data
+            xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][i], label=str(int(cla)), marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][i]), alpha=alpha, s=markersizes[0])
+            # rest of the data
+            xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][i], label=str(int(cla)), marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][i]), alpha=alpha, s=markersizes[0])    
+    
     
     handles, labels = axes[0,1].get_legend_handles_labels()
-    #handles = handles[:10] + handles[-5:]
-    handles = handles[:10] + handles[20:21] + [handles[-20+i*10] for i in range(time)]
+    handles = handles[:10] + handles[40:41] # + [handles[-40+i*10] for i in range(time)]
+    labels = labels[:10] + labels[40:41] + [labels[-40+i*10] for i in range(time)]
 
-    #labels = labels[:10] + labels[-5:]
-    labels = labels[:10] + labels[20:21] + [labels[-20+i*10] for i in range(time)]
-
-
-    
+    from matplotlib.lines import Line2D
+    handles += [Line2D([0], [0], marker=markers[i], color='w', label='', markerfacecolor='black', markersize=6) for i in range(time)]    
 
     axes[0,1].legend(handles, labels, title='class label', loc='center left', bbox_to_anchor=(1, 0), frameon=False)
     bottom, top = plt.ylim()
@@ -1098,32 +1127,307 @@ def plot_tsne_timetrajectories2(representations, imgs, targets, points=1000, sho
     axes[1,1].set_xlabel('t-SNE dimension 2')
     
     
-    ax_in = axes[0,1]
-    ax_in.set_xlim([x_data_u[5,-1] - 7, x_data_u[5,-1] + 7])
-    ax_in.set_ylim([y_data_u[5,-1] - 7, y_data_u[5,-1] + 7])
-    
-    # Create a Rectangle patch
-    rect = patches.Rectangle((ax_in.get_xlim()[0],ax_in.get_ylim()[0]),ax_in.get_xlim()[1]-ax_in.get_xlim()[0],ax_in.get_ylim()[1]-ax_in.get_ylim()[0],linewidth=1,edgecolor='black',facecolor='none')
-    # Add the patch to the Axes
-    axes[0,0].add_patch(rect)
+    # ax_in = axes[0,1]
+    # ax_in.set_xlim([x_data_u[5,-1] - 7, x_data_u[5,-1] + 7])
+    # ax_in.set_ylim([y_data_u[5,-1] - 7, y_data_u[5,-1] + 7])
+    # 
+    # # Create a Rectangle patch
+    # rect = patches.Rectangle((ax_in.get_xlim()[0],ax_in.get_ylim()[0]),ax_in.get_xlim()[1]-ax_in.get_xlim()[0],ax_in.get_ylim()[1]-ax_in.get_ylim()[0],linewidth=1,edgecolor='black',facecolor='none')
+    # # Add the patch to the Axes
+    # axes[0,0].add_patch(rect)
     # Annotate
-    axes[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-2,+1]), weight='bold')
+    # axes[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-2,+1]), weight='bold')
+    
     for n, ax in enumerate(axes.flatten()):
         ax.text(-0.1, 1.05, string.ascii_uppercase[n], weight='bold', transform=ax.transAxes, size=18)
     
-    
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.3)
-    
-       
     plt.show()
 
     pass
 
-
-def plot_relative_distances(representations, targets, distance_metric):
+def plot_relative_distances(rep, rep_unocc, targets, distance_metric=):
     
-    # define representations
-    # calculate relative distances with distance metric
+        
+    def plot_distribution(measure, ax, lab=None, xlabel=''):
+        sns.distplot(measure, fit=st.norm, kde=False, label=lab, ax=ax)
+        ax.set_xlabel(xlabel)
+        ax.set_ylabel('Probability density')
+        ax.axvline(x=measure.mean(),
+            ymin=0.0, ymax = 5, linewidth=1, color='gray')
+        ax.axvline(x=measure.mean()-measure.std(),
+            ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
+        ax.axvline(x=measure.mean()+measure.std(),
+            ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
+    
+    pass
+
+def plot_softmax_output(network_output, targets, images):
+    prop_cycle = plt.rcParams['axes.prop_cycle']
+    colors = prop_cycle.by_key()['color']
+    
+    batchsize,time,classes = network_output.shape
+    
+    softmax_output = torch.zeros([batchsize, time, classes])
+    for ti in range(time):
+        # calculate softmaxover time
+        softmax_output[:,ti,:] = F.softmax(network_output[:,ti,:], 1)        
+    
+    
+    # find interesting samples
+    # -----
+    
+    correct_t0 = []
+    for i in range(batchsize):
+        if (np.argmax(network_output[i, 0, :]) == int(targets[i])):
+            correct_t0.append(i)
+
+
+    correct = []
+    for i in range(batchsize):
+        if (np.argmax(network_output[i, -1, :]) == int(targets[i])):
+            correct.append(i)
+
+    revised = []
+    for i in range(batchsize):
+        if (np.argmax(network_output[i, 0, :]) != np.argmax(network_output[i, -1, :])) and (np.argmax(network_output[i, -1, :]) == int(targets[i])):
+            revised.append(i)
+
+    reinforced = []
+    for i in range(batchsize):
+        if (np.argmax(network_output[i, -2, :]) == np.argmax(network_output[i, -1, :])) and (np.argmax(network_output[i, -3, :]) == np.argmax(network_output[i, -1, :])) and (np.argmax(network_output[i, -1, :]) == int(targets[i])):
+            reinforced.append(i)
+
+    destroyed = []
+    for i in range(batchsize):
+        if (np.argmax(network_output[i, -1, :]) != np.argmax(network_output[i, 0, :])) and (np.argmax(network_output[i, 0, :]) == int(targets[i])):
+            destroyed.append(i)
+    
+    print('[INFO] tsne output stats:')
+    print('\t correct:\t {}, percentage: {}'.format(
+            len(correct), len(correct)/batchsize))
+    print('\t revised:\t {}, of all: {}, of correct: {}'.format(
+            len(revised), len(revised)/batchsize, np.round(len(revised)/len(correct), 3)))
+    print('\t reinforced:\t {}, of all: {}, of correct: {}'.format(
+            len(reinforced), len(reinforced)/batchsize, np.round(len(reinforced)/len(correct), 3)))
+
+    print('\t destroyed:\t {}, of all: {}, of false: {}, of correct_t0: {}'.format(
+            len(destroyed), len(destroyed)/batchsize, np.round(len(destroyed)/(batchsize-len(correct)), 3), np.round(len(destroyed)/(len(correct_t0)), 3)))
+    
+    # look at interesing cases
+    # -----
+    
+    for j in reinforced[30:30]:#range(55,60,1):
+        fig, ax = plt.subplots()
+        for ti in range(time):
+            ax.plot(softmax_output[j,ti,:], label='$t_{}$'.format(ti))        
+        
+        ax.set_yscale('log')
+        ax.set_ylim([1e-8,3])
+        
+        # Shrink current axis by 20%
+        box = ax.get_position()
+        ax.set_position([box.x0, box.y0, box.width * 0.8, box.height])
+        # Put a legend to the right of the current axis
+        ax.legend(frameon=True, facecolor='white', edgecolor='white', framealpha=1.0, bbox_to_anchor=(1, .5), loc='center left')
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=2.0), (.835, .775), xycoords='figure fraction', boxcoords="offset points",
+                        pad=0.3, frameon=True)
+        ax.axvline(x=targets[j], ymin=0, ymax=2, color='black', linestyle='--')
+        ax.add_artist(ab)
+        ax.set_ylabel('Softmax output (probability)')
+        ax.set_xlabel('Class')
+        print('showing image no.', j)
+        ax.text(-0.1, 1.01, '{}'.format(j), weight='bold',
+                      transform=ax.transAxes, size=40)
+        plt.xticks(np.arange(0, classes, step=classes//10))
+    plt.show()
+    
+    
+    # calculate mean output
+    # -----
+    pointsofclass = {}
+    for (i, cla) in enumerate(range(classes)):
+        pointsofclass[i] = [p for (j, p) in enumerate(
+            softmax_output.numpy()) if int(targets[j]) == cla]
+        
+    mean_output = np.zeros([classes, time, classes])
+    error_output = np.zeros([classes, time, classes])
+
+    for cla in range(classes):
+        try:
+            mean_output[cla, :, :] = np.array(pointsofclass[cla]).mean(axis=0)
+            error_output[cla, :, :] = np.array(pointsofclass[cla]).std(
+                axis=0) / np.sqrt(len(pointsofclass[cla]))
+        except:
+            print('error, class {} not found'.format(cla))
+            mean_output[cla, :, :] = 0
+            error_output[cla, :, :] = 0
+
+    fig, axes = plt.subplots(2, 5, sharex=True, sharey=True, figsize=(14, 5))
+    for j, ax in enumerate(axes.flatten()):
+        for ti in range(time):
+            ax.plot(mean_output[j, ti, :], label='$t_{}$'.format(ti))
+            ax.fill_between(np.arange(
+                0, classes, 1), mean_output[j, ti, :] + error_output[j, ti, :], mean_output[j, ti, :] - error_output[j, ti, :], alpha=0.25)
+
+        # logscale!
+        ax.set_yscale('log')
+        ax.set_ylim([1e-4, 1])
+        ax.axvline(x=int(j),
+                   ymin=0, ymax=2, color='black', linestyle='--')
+        # ax.add_artist(ab)
+        ax.set_ylabel('Softmax output')
+        ax.set_xlabel('Class')
+
+    axes[0, 4].legend(frameon=True, facecolor='white', edgecolor='white',
+                      framealpha=1.0, bbox_to_anchor=(1.0, .8), loc='center left')
+
+    plt.xticks(np.arange(0, classes, step=classes//10))
+    plt.suptitle('Mean softmax output over candidates for each target')
+    #plt.savefig('mean_softmax.pdf')
+    plt.show()
+    
+    
+    fig, axes = plt.subplots(4, 5, sharex=True, sharey=True, figsize=(14, 10))
+    for j, ax in enumerate(axes.flatten()):
+        j += 150
+        for ti in range(time):
+            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(ti), color=colors[ti])
+
+        ax.set_yscale('log')
+        ax.set_ylim([1e-9, 5])
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1), (.9, .1), xycoords='axes fraction', boxcoords="offset points",
+                                      pad=0.3, frameon=True)
+        ax.axvline(x=targets[j],
+                   ymin=0, ymax=2, color='black', linestyle='--')
+        ax.add_artist(ab)
+        ax.set_ylabel('Softmax output')
+        ax.set_xlabel('Class')
+
+    axes[0, 4].legend(frameon=True, facecolor='white', edgecolor='white',
+                      framealpha=1.0, bbox_to_anchor=(1.0, .8), loc='center left')
+
+    plt.xticks(np.arange(0, classes, step=classes//10))
+    plt.suptitle('Softmax output for specific candidates')
+    #plt.savefig('specific_candidates.pdf')
+    plt.show()
+    
+    
+    
+    lstylist = ['-', '--', ':', '-.']
+    markerlist = ['o', 'v', 's', 'D']
+    fillstylelist = ['full', 'full', 'full', 'full']
+    candlist = [87, 128, 206] 
+    meanlist = [2, 3, 4]
+    fig, axes = plt.subplots(2, 3, sharex=False, sharey='row', figsize=(12, 8))
+    
+    for j, ax in zip(candlist, axes[0]):
+        for ti in range(time):
+            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(
+                ti), linewidth=3, marker=markerlist[ti], markersize=7.0, fillstyle=fillstylelist[ti], color=colors[ti])
+
+        ax.set_yscale('log')
+        ax.set_ylim([1e-10, 5])
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.6), (.805, .16), xycoords='axes fraction', boxcoords="offset points",
+                                      pad=0.3, frameon=True)
+        ax.axvline(x=targets[j], ymin=0,
+                   ymax=2, color='black', linestyle='--', linewidth=2)
+        ax.add_artist(ab)
+        #ax.set_ylabel('Softmax output')
+        ax.set_xticks(np.arange(0, classes, step=classes//10))
+        # ax.set_xlabel('Class')
+    for j, ax in zip(meanlist, axes[1]):
+        for ti in range(time):
+            #ax.plot(mean_output[j,t,:], label='$t_{}$'.format(t), linewidth=3, marker=markerlist[t], markersize=7.0, fillstyle=fillstylelist[t], color=colors[t])
+            # ax.bar(np.arange(0,10,1),output_data[0,i,j,:],label='$t_{}$'.format(i))
+
+            # fill between error
+            #ax.fill_between(np.arange(0,10,1), mean_output[j,t,:]+error_output[j,t,:], mean_output[j,t,:]-error_output[j,t,:], alpha=0.25)
+            # small outline for errors
+            # ax.plot(mean_output[j,t,:]+error_output[j,t,:], linewidth=1, color=colors[t]) #, linestyle=lstylist[t])
+            # ax.plot(mean_output[j,t,:]-error_output[j,t,:], linewidth=1, color=colors[t]) #, linestyle=lstylist[t])
+            ax.errorbar(np.arange(0, classes, 1), mean_output[j, ti, :], label='$t_{}$'.format(
+                ti), linewidth=3, marker=markerlist[ti], markersize=7.0, fillstyle=fillstylelist[ti], color=colors[ti], yerr=error_output[j, ti, :])
+
+        # switch on or off logscale
+        ax.set_yscale('log')
+        ax.set_ylim([1e-4, 3])
+
+
+        ax.axvline(x=int(j), ymin=0, ymax=2, color='black',
+                   linestyle='--', linewidth=2)
+        # ax.add_artist(ab)
+        #ax.set_ylabel('Softmax output')
+        ax.set_xlabel('Class label')
+        ax.set_xticks(np.arange(0, classes, step=classes//10))
+
+    axes[0, 2].legend(frameon=True, facecolor='white', edgecolor='white', framealpha=1.0,
+                      bbox_to_anchor=(1., .725), loc='center left', title='time step')
+    #axes[0,1].set_title('Specific candidates')
+    #axes[1,1].set_title('Mean softmax output per class (2,4,8)')
+    axes[0, 0].set_ylabel('Softmax output')
+    axes[1, 0].set_ylabel('Softmax output')
+
+    axes[0, 0].text(-0.57, 1.03, 'A', weight='bold',
+                    transform=axes[0, 0].transAxes, size=40)
+    axes[1, 0].text(-0.57, 1.03, 'B', weight='bold',
+                    transform=axes[1, 0].transAxes, size=40)
+
+    plt.subplots_adjust(left=None, bottom=None, right=0.88,
+                        top=0.935, wspace=None, hspace=None)
+    # plt.savefig('os_softmax33avg.ps')
+    # plt.savefig('os_softmax33avg.pdf')
+    plt.show()
+    
+    
+    candlist = [87, 128, 206]
+    candlist2 = [24, 33, 29]
+
+    fig, axes = plt.subplots(2, 3, sharex=False, sharey='row', figsize=(12, 8))
+
+    for j, ax in zip(candlist, axes[0]):
+        for ti in range(time):
+            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(
+                ti), linewidth=3, marker=markerlist[ti], markersize=7.0, fillstyle=fillstylelist[ti], color=colors[ti])
+
+        ax.set_yscale('log')
+        ax.set_ylim([1e-10, 5])
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.6), (.805, .16), xycoords='axes fraction', boxcoords="offset points",
+                                      pad=0.3, frameon=True)
+        ax.axvline(x=targets[j], ymin=0,
+                   ymax=2, color='black', linestyle='--', linewidth=2)
+        ax.add_artist(ab)
+        ax.set_xticks(np.arange(0, classes, step=classes//10))
+    for j, ax in zip(candlist2, axes[1]):
+        for ti in range(time):
+            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(
+                ti), linewidth=3, marker=markerlist[ti], markersize=7.0, fillstyle=fillstylelist[ti], color=colors[ti])
+
+        ax.set_yscale('log')
+        ax.set_ylim([1e-10, 5])
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.6), (.805, .16), xycoords='axes fraction', boxcoords="offset points",
+                                      pad=0.3, frameon=True)
+        ax.axvline(x=targets[j], ymin=0,
+                   ymax=2, color='black', linestyle='--', linewidth=2)
+        ax.add_artist(ab)
+        ax.set_xticks(np.arange(0, classes, step=classes//10))
+
+        ax.set_xlabel('Class label')
+
+    axes[0, 2].legend(frameon=True, facecolor='white', edgecolor='white', framealpha=1.0,
+                      bbox_to_anchor=(1., .725), loc='center left', title='time step')
+    axes[0, 0].set_ylabel('Softmax output')
+    axes[1, 0].set_ylabel('Softmax output')
+
+    axes[0, 0].text(-0.38, 1.03, 'A', weight='bold',
+                    transform=axes[0, 0].transAxes, size=40)
+    plt.subplots_adjust(left=None, bottom=None, right=0.88,
+                        top=0.935, wspace=None, hspace=None)
+    # plt.savefig('os_softmax33.ps')
+    # plt.savefig('os_softmax33.pdf')
+    plt.show()
+    
+    sys.exit()
     pass
 
 # ---------------------
