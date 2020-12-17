@@ -1146,9 +1146,8 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
 
     pass
 
-def plot_relative_distances(rep, rep_unocc, targets, distance_metric=):
+def plot_relative_distances(rep, nhot_targets, rep_u, onehot_targets_u):
     
-        
     def plot_distribution(measure, ax, lab=None, xlabel=''):
         sns.distplot(measure, fit=st.norm, kde=False, label=lab, ax=ax)
         ax.set_xlabel(xlabel)
@@ -1160,6 +1159,11 @@ def plot_relative_distances(rep, rep_unocc, targets, distance_metric=):
         ax.axvline(x=measure.mean()+measure.std(),
             ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
     
+    sim = distancemetrics.Similarity(minimum=0.001)
+    
+    # gather all points per class
+    # get the centroids of each class
+    # get the distances of each point to the centroid
     pass
 
 def plot_softmax_output(network_output, targets, images):
