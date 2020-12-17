@@ -167,7 +167,7 @@ def pil_loader(path):
 class StereoImageFolder(Dataset):
 	"""Modified ImageFolder Structure to Import Stereoscopic Data"""
 
-	def __init__(self, root_dir, train, stereo=False, loader=pil_loader, transform=None, target_transform=None):
+	def __init__(self, root_dir, train, stereo=False, loader=pil_loader, transform=None, target_transform=None, nhot_targets=False):
 		"""
 		Args:
 			root_dir (string): Directory with all the images.
@@ -184,6 +184,7 @@ class StereoImageFolder(Dataset):
 		self.width = 32
 		self.loader = loader
 		self.stereo = stereo
+		self.nhot = nhot_targets
 		
 		# move through the filestructure to get a list of all images
 		self._add_data(root_dir)
@@ -230,16 +231,24 @@ class StereoImageFolder(Dataset):
 		img_name = self.paths_to_left_samples[idx]
 		image = self.loader(img_name)
 		
-		
 		target = []
-		t_list = self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]
-		
-		if t_list.__class__ == str:
-			target = np.array(t_list, dtype=np.int64) # target.append(int(t_list))
+
+		if self.nhot:
+			t_list = self.paths_to_left_samples[idx].rsplit('.',1)[0].rsplit('-',3)[-3:]
+			if len(t_list)==1:
+				raise NotImplementedError('nhot targets not implemented for this dataset')
+			target = np.array(t_list, dtype=np.int64)
+			
 		else:
-			for t in self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]:
-				target.append(int(t))
-			target = np.array(target, dtype=np.int64)
+			t_list = self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]
+			
+			if t_list.__class__ == str:
+				target = np.array(t_list, dtype=np.int64) # target.append(int(t_list))
+			else:
+				for t in self.paths_to_left_samples[idx].rsplit('_', 1)[-1].rsplit('/')[0]:
+					target.append(int(t))
+				target = np.array(target, dtype=np.int64)
+		
 		
 		if self.target_transform is not None:
 			target = self.target_transform(target)
