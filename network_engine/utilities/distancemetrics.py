@@ -53,6 +53,8 @@ import cProfile
 import numpy as np
 import hashlib
 
+from fractions import Fraction
+
 memoization = {}
 
 
@@ -131,7 +133,7 @@ class Similarity:
         q_square = self.vector_operators.square(q_vec)
         return max(pq / (p_square + q_square - pq), self.e)
 
-    def fractional_distance(self, p_vec, q_vec, fraction=2.0):
+    def fractional_distance(self, p_vec, q_vec, fraction=Fraction(1,2)):
         """
         This method implements the fractional distance metric. I have
         implemented memoization for this method to reduce
@@ -144,21 +146,23 @@ class Similarity:
         :return: the fractional distance between vector one and two
         """
 
-        memoize = True
+        memoize = False
         if memoize:
             key = self.get_key(p_vec, q_vec)
             x = memoization.get(key)
             if x is None:
                 diff = p_vec - q_vec
-                diff_fraction = diff**fraction
+                diff_fraction = np.abs(diff)**fraction
                 return max(math.pow(np.sum(diff_fraction), 1/fraction), self.e)
             else:
                 return x
         else:
             diff = p_vec - q_vec
-            diff_fraction = diff**fraction
+            diff_fraction = np.abs(diff)**fraction
             return max(math.pow(np.sum(diff_fraction), 1/fraction), self.e)
+    
 
+        
     @staticmethod
     def get_key(p_vec, q_vec):
         """
