@@ -312,26 +312,22 @@ def evaluate_recurrent(dataset, network, batch_size, criterion, timesteps, stere
     return evaluation_data, embedding_data
 
 
-def show_class_activation(test_loader, network, timesteps, stereo):
-    
+def generate_class_activation(test_loader, network, timesteps, stereo, max_iteration=50):
     cam = CAM(network)
     loss = 0
     accuracy = 0
-    
-    # confusion_matrix = visualizer.ConfusionMatrix(n_cls=network.fc.out_features)
-    # precision_recall = visualizer.PrecisionRecall(n_cls=network.fc.out_features)
+    cam_list = []
+    input_list = []
+    target_list = []
+    output_list = []
+    topk_prob_list = []
+    topk_pred_list = []
 
     # TODO: Solve the unroll-timestep handling as a function parameter
     #timesteps = CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond']
 
     with torch.no_grad():
-        cam_list = []
-        target_list = []
-        topk_prob_list = []
-        topk_pred_list = []
-        
         for i, data in enumerate(test_loader):
-            
             input_tensor, target_tensor = data
             if stereo:
                 input_tensor = torch.cat(input_tensor, dim=1)
@@ -341,37 +337,27 @@ def show_class_activation(test_loader, network, timesteps, stereo):
             
             outputs, (cams, topk_prob, topk_pred) = cam(input_tensor)            
             cam_list.append(cams)
+            input_list.append(input_tensor)
             target_list.append(target_tensor)
+            output_list.append(outputs)
             topk_prob_list.append(topk_prob)
             topk_pred_list.append(topk_pred)
             
-            if i > 50:
+            if i > max_iteration:
                 break
-        
-        visualizer.show_cam_samples(cams, input_tensor, target_tensor, topk_prob, topk_pred, n_samples=5)
-        # lists to tensors
-        cams = torch.cat(cam_list, dim=0)
-        target_tensor = torch.cat(target_list, dim=0)
-        topk_prob = torch.cat(topk_prob_list, dim=0)
-        topk_pred = torch.cat(topk_pred_list, dim=0)
-        
-        # return cams, target_tensor, topk_prob, topk_pred
-        visualizer.show_cam_means(cams, target_tensor, topk_prob, topk_pred)
-        
-        # filter correct predictions - best topk at last timestep = target
-        correct_indices = (target_tensor == topk_pred[:, -1, 0])
-        # show means for correct predictions
-        visualizer.show_cam_means(
-            cams[correct_indices],
-            target_tensor[correct_indices],
-            topk_prob[correct_indices],
-            topk_pred[correct_indices]
-            )
-        # visual_prediction = visualizer.plot_classes_preds(outputs[:,-1,:].cpu(), input_tensor[:,-1,:,:,:].cpu(), target_tensor.cpu(), CONFIG['class_encoding'], CONFIG['image_channels'])
-    pass
+    
+    class_activations = torch.cat(cam_list, dim=0)
+    inputs = torch.cat(input_list, dim=0)
+    targets = torch.cat(target_list, dim=0)
+    outputs = torch.cat(output_list, dim=0)
+    topk_probabilities = torch.cat(topk_prob_list, dim=0)
+    topk_predictions = torch.cat(topk_pred_list, dim=0)
+    
+    return class_activations, inputs, targets, outputs, topk_probabilities, topk_predictions
 
 
-def extract_hidden_representation(test_loader, network, timesteps, stereo):
+
+def generate_hidden_representation(test_loader, network, timesteps, stereo):
     loss = 0
     accuracy = 0
     feature_list = []
@@ -528,14 +514,14 @@ else:
 if CONFIG['dataset'] == 'mnist':
     train_dataset = datasets.MNIST(root=CONFIG['input_dir'], train=True,
     transform=transforms.Compose([
-        transforms.CenterCrop(32),
+        #transforms.CenterCrop(32),
         transforms.ToTensor(),
         transforms.Normalize((0.,), (1.,))
     ,]),
     download=True)
     test_dataset = datasets.MNIST(root=CONFIG['input_dir'], train=False,
     transform=transforms.Compose([
-        transforms.CenterCrop(32),
+        #transforms.CenterCrop(32),
         transforms.ToTensor(),
         transforms.Normalize((0.,), (1.,))
     ,]),
@@ -619,7 +605,8 @@ stats_writer = SummaryWriter(output_dir)
 # configure network
 network = RecConvNet(
     CONFIG['connectivity'],
-    kernel_size=CONFIG['kernel_size'], input_channels=CONFIG['image_channels'],
+    kernel_size=CONFIG['kernel_size'],
+    input_channels=CONFIG['image_channels'],
     n_features=CONFIG['n_features'],
     num_layers=CONFIG['network_depth'], 
     num_targets=CONFIG['classes']
@@ -643,49 +630,87 @@ else:
 if FLAGS.testrun:
     SIZE = 1000
     np.random.seed(1234)
-
+    
+    # # load pretrained network
+    # network, optimizer, start_epoch = load_checkpoint(network, optimizer, '/Users/markus/Research/Code/titan/trained_models/BLT3_osmnist2r_mono/')
+    # #network.eval()
+    # 
+    # test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, CONFIG['epochs'], CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+    
     # load pretrained network
     network, optimizer, start_epoch = load_checkpoint(network, optimizer, '/Users/markus/Research/Code/titan/trained_models/BLT3_osmnist2r_stereo/')
+
+    # prepare softmax analysis
+    # -----
     
     test_dataset = StereoImageFolder(
         root_dir=CONFIG['input_dir'] + '/{}'.format(CONFIG['dataset']),
         train=False,
         stereo=CONFIG['stereo'],
-        transform=test_transform
+        transform=test_transform,
+        nhot_targets=True
         )
-    
+
     rep_sample = list(np.random.choice(range(len(test_dataset)), size=SIZE, replace=False)) 
     test_dataset = torch.utils.data.Subset(test_dataset, rep_sample)
     test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
-    
-    #test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, CONFIG['epochs'], CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
 
-    feat, img, tar, out = extract_hidden_representation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
-    
-    visualizer.plot_softmax_output(out, tar, img)
+    feat, img, tar, out = generate_hidden_representation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
     
-    test_dataset = StereoImageFolder(
+    # prepare tsne analysis
+    # -----
+    
+    test_dataset_unoccluded = StereoImageFolder(
         root_dir=CONFIG['input_dir'] + '/{}'.format('osmnist2_0occ'),
         train=False,
         stereo=CONFIG['stereo'],
         transform=test_transform
         )
     
-    rep_sample = list(np.random.choice(range(len(test_dataset)), size=SIZE, replace=False)) 
-    test_dataset = torch.utils.data.Subset(test_dataset, rep_sample)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
+    test_dataset_unoccluded = torch.utils.data.Subset(test_dataset_unoccluded, rep_sample)
+    test_loader_unoccluded = torch.utils.data.DataLoader(test_dataset_unoccluded, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
     
-    feat2, img2, tar2, _ = extract_hidden_representation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
+    featu, imgu, taru, _ = generate_hidden_representation(test_loader_unoccluded, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
-    feat = torch.cat([feat,feat2], dim=0)
-    img = torch.cat([img,img2], dim=0)
-    tar = torch.cat([tar,tar2], dim=0)
 
-    visualizer.plot_tsne_evolution(feat, img, tar, overwrite=False)
+
+    
+    # hand the date to the visualization functions
+    # -----
+    # visualizer.plot_tsne_evolution(
+    #     torch.cat([feat,featu], dim=0),
+    #     torch.cat([img,imgu], dim=0),
+    #     torch.cat([tar[:,0],taru], dim=0),
+    #     overwrite=False)
+    #visualizer.plot_softmax_output(out, tar[:,0], img)    
+    #visualizer.plot_relative_distances(feat, tar, featu, taru)
+    
+    
+    # prepare class activation map analysis
+    # -----
+    
+    cams, img, tar, out, topk_prob, topk_pred = generate_class_activation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
+    
+    visualizer.show_cam_samples(cams, img, tar[:,0], topk_prob, topk_pred, n_samples=5)
+    visualizer.show_cam_means(cams, tar[:,0], topk_prob, topk_pred)
+    
+    # filter correct predictions - best topk at last timestep = target
+    correct_indices = (tar[:,0] == topk_pred[:, -1, 0])
+    # show means for correct predictions
+    visualizer.show_cam_means(
+        cams[correct_indices],
+        tar[correct_indices,0],
+        topk_prob[correct_indices],
+        topk_pred[correct_indices]
+        )    
     
     import sys
     sys.exit()
+    
+    # TODO: Write this functions to plot CAMS for the paper
+    visualizer.plot_cam_samples()
+    visualzier.plot_cam_means()
 
 # training loop
 
