@@ -68,12 +68,14 @@ from PIL import Image
 from textwrap import wrap
 from math import sqrt
 
-# van der Maaten TSNE implementations
-import utilities.tsne.bhtsne as bhtsne
-import utilities.tsne.tsne as tsne
-
 import utilities.distancemetrics as distancemetrics
 
+# van der Maaten TSNE implementations
+try:
+    import utilities.tsne.bhtsne as bhtsne
+    import utilities.tsne.tsne as tsne
+else:
+    pass
 
 
 
