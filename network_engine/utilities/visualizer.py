@@ -59,9 +59,11 @@ from mpl_toolkits.mplot3d import Axes3D, proj3d
 from matplotlib import offsetbox, patches
 from matplotlib.markers import MarkerStyle
 import seaborn as sns
+import pandas as pd
 
 
 import scipy.optimize as opt
+import scipy.stats as st
 from PIL import Image
 from textwrap import wrap
 from math import sqrt
@@ -165,6 +167,22 @@ def make_cmap(colors, position=None, bit=False):
 
 
 # ---------------------
+# define a 2D gaussian distribution
+# ---------------------
+
+def twoD_Gaussian(pos, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
+    x,y = pos
+    xo = float(xo)
+    yo = float(yo)    
+    a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
+    b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
+    c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
+    g = offset + amplitude*np.exp( - (a*((x-xo)**2) + 2*b*(x-xo)*(y-yo) 
+                            + c*((y-yo)**2)))
+    return g.ravel()
+
+
+# ---------------------
 # make custom image annotations
 # ---------------------
 
@@ -230,6 +248,8 @@ class ImageAnnotations3D():
             self.rot = self.ax3d.get_proj()
             for s,ab in zip(self.xyz, self.annot):
                 ab.xy = self.proj(s)
+
+
 
 
 
@@ -457,8 +477,11 @@ def plot_classes_preds(output, images, labels, classes):
     return fig
 
 
-# saliency maps or class activation mapping
-# -----
+# -----------------
+# class activation mapping
+# -----------------
+
+
 
 def saliencymap_to_figure(smap, pic, alpha=0.5):
     """
@@ -692,9 +715,25 @@ def show_cam_means(cams, targets, probs, preds):
     
     plt.show()
     pass
+    
+def plot_cam_samples(cams, pics, targets, probs, preds):
+    show_cam_samples(cams, pics, targets, probs, preds)
+    list_of_indices = [1,2,3]
+    
+    pass
 
+def plot_cam_means(cams, targets, probs, preds):
+    show_cam_means(cams, targets, probs, preds)  
+    pass
+
+
+
+# -----------------
+# tsne and softmax output functions
+# -----------------
 
 def plot_tsne_timetrajectories(representations, imgs, targets, points=1000, show_stimuli=False, show_indices=False, N='all', savefile='./../trained_models/tsnesave.npy', overwrite=False):
+    """plot_tsne_timetrajectories is deprecated, use plot_tsne_evolution instead"""
     
     # Constants, maybe become variables later
     N_UNOCC = 10
@@ -896,7 +935,8 @@ def plot_tsne_timetrajectories(representations, imgs, targets, points=1000, show
     plt.show()
 
     pass
-    
+
+
 def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show_indices=False, N='all', savefile='./../trained_models/tsnesave', overwrite=False):
     
     # hack to mitigate output
@@ -911,6 +951,9 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
     classes = [0,1,2,3,4,5,6,7,8,9]    
 
     markers = ["o","v","s","D","H"]
+    # same markers for all timesteps
+    markers = ["o","o","o","o","o"]
+    
     markersizes = [10,10] #[10,30]
     alpha=1.0
     colors = sns.color_palette("colorblind", len(classes))
@@ -987,7 +1030,7 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
     # shift data according to timestep
     x_spread = x_data.std()
     for ti in range(time):
-        x_data[:,ti] = x_data[:,ti] + ti * x_spread*6
+        x_data[:,ti] = x_data[:,ti] + ti * x_spread*6 #6
         x_data_u[:,ti] = x_data_u[:,ti] + ti * x_spread*6
         x_data_uc[:,ti] = x_data_uc[:,ti] + ti * x_spread*6
 
@@ -999,10 +1042,19 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
             for (i, cla) in enumerate(classes):
                 xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
                 yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
-                ax.scatter(xc,yc,c=colors[i], label=str(int(cla)), marker=markers[ti], alpha=alpha, s=markersizes[pltnr])
-    
+                ax.scatter(xc,yc,c=colors[i], label=str(int(cla)), marker=markers[ti], alpha=alpha, s=markersizes[pltnr])        
+            
+            bracket_ypos = 1.05*y_data.max()
+            data_cloud = np.concatenate([x_data[:,ti], x_data_u[:,ti]])
+            bracket_xpos = data_cloud.mean()
+            bracket_width = data_cloud.std()/3
+            ax.annotate('$t_{}$'.format(ti), xy=(bracket_xpos, bracket_ypos), xytext=(bracket_xpos, bracket_ypos), xycoords='data', 
+            fontsize=9, ha='center', va='bottom',
+            bbox=dict(boxstyle='square', fc='white', ec='white'),
+            arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(bracket_width), lw=1.0))
         
         ax.scatter([0], [0], c='white', label=' ')
+        ax.axis('off')
     
     # only second plot gets the unoccluded markers
     # unoccluded trajectories
@@ -1026,7 +1078,7 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
             colorset[pltnr][hl] = colors[hl]
             marker_fills[pltnr][hl] = 'full'
     
-    for pltnr,ax in enumerate([axes[1,0],axes[1,1]]):       
+    for pltnr, ax in enumerate([axes[1,0],axes[1,1]]):       
         if N=='all':
             n_indices = range(len(projected_data))
         elif isinstance(N, int):
@@ -1073,6 +1125,7 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
                     artists.append(ax.add_artist(ab))
                     # if i == 622:
                     #   artists.append(ax.add_artist(ab2))
+        ax.axis('off')
     
     ax, pltnr = axes[1,0], 0
     for ti in range(time):
@@ -1146,8 +1199,11 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
 
     pass
 
-def plot_relative_distances(rep, nhot_targets, rep_u, onehot_targets_u):
+def plot_relative_distances(representations, nhot_targets, representations_unocc, onehot_targets_unocc):
     
+    classes = 10
+    n_occ = 2
+
     def plot_distribution(measure, ax, lab=None, xlabel=''):
         sns.distplot(measure, fit=st.norm, kde=False, label=lab, ax=ax)
         ax.set_xlabel(xlabel)
@@ -1159,11 +1215,117 @@ def plot_relative_distances(rep, nhot_targets, rep_u, onehot_targets_u):
         ax.axvline(x=measure.mean()+measure.std(),
             ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
     
+    
+    points,time,feature,height,width = representations.shape
+    representations = representations.view(points,time,-1).numpy()
+    representations_unocc = representations_unocc.view(points,time,-1).numpy()
+    
+    _,_,dim = representations.shape
+    _,n_targets = nhot_targets.shape
+    
+    
+    # get the centroid of the un-occluded representation for each class
+    # and timestep
+    centroid_unocc = np.zeros([classes, time, dim]) # (10,4,32)
+    for (i,cla) in enumerate(range(classes)):
+        r_sortedbyclass = np.array([p for (j,p) in enumerate(representations_unocc) if onehot_targets_unocc[j]==cla])
+        centroid_unocc[cla,:,:] = np.mean(r_sortedbyclass, axis=0)
+
+    
+    # calculate the distances for the two occluder-centroids to the representation
+    # of the occluded digits
+    
     sim = distancemetrics.Similarity(minimum=0.001)
     
-    # gather all points per class
-    # get the centroids of each class
-    # get the distances of each point to the centroid
+    distances = np.zeros([points,time,n_targets])
+    relative_distances = np.zeros([points,time,n_targets-1])
+    
+
+    for ti in range(time):
+        for i,(a,b,c) in enumerate(nhot_targets):
+            distances[i,ti,0] = sim.fractional_distance(
+                representations[i,ti], centroid_unocc[a,ti])
+            distances[i,ti,1] = sim.fractional_distance(
+                representations[i,ti], centroid_unocc[b,ti])
+            distances[i,ti,2] = sim.fractional_distance(
+                representations[i,ti], centroid_unocc[c,ti])
+    
+    # calculate relative distances relative_distance = d_zur_8 / 0.5(d_zur_8 + d_zur_2)
+    for ti in range(time):
+        relative_distances[:,ti,0] = distances[:,ti,0] / (0.5*(distances[:,ti,0] + distances[:,ti,1]))
+        relative_distances[:,ti,1] = distances[:,ti,0] / (0.5*(distances[:,ti,0] + distances[:,ti,2]))
+        
+    
+    # create distribution plots
+    # -----
+    
+    fig, ax = plt.subplots()
+    for ti in range(time):
+        plot_distribution(relative_distances[:,ti,0], ax, lab='$t={}$'.format(ti))
+    ax.legend()
+    ax.set_title('relative distance target, occluder 1')
+    # plt.savefig('A.pdf')
+    plt.show()
+    
+    fig, ax = plt.subplots()
+    for ti in range(time):
+        plot_distribution(relative_distances[:,ti,1], ax, lab='$t={}$'.format(ti))
+    ax.legend()
+    ax.set_title('relative distance target, occluder 2')
+    # plt.savefig('B.pdf')
+    plt.show()
+    
+
+    fig, ax = plt.subplots()
+    plot_distribution(distances[:,0,0], ax, lab='$target,t=0$')
+    plot_distribution(distances[:,1,0], ax, lab='$target,t=1$')
+    plot_distribution(distances[:,2,0], ax, lab='$target,t=2$')
+    plot_distribution(distances[:,3,0], ax, lab='$target,t=3$')
+    plot_distribution(distances[:,0,1], ax, lab='$occ1,t=0$')
+    plot_distribution(distances[:,1,1], ax, lab='$occ1,t=1$')
+    plot_distribution(distances[:,2,1], ax, lab='$occ1,t=2$')
+    plot_distribution(distances[:,3,1], ax, lab='$occ1,t=3$', xlabel='absolute distance')
+    ax.set_title('absolute distance target to stimulus')
+    ax.legend()
+    # plt.savefig('C.pdf')
+    plt.show()
+    
+    
+    #relative_distances_1 = np.zeros([4,1190])
+    #relative_distances = np.zeros([points,time,n_targets-1])
+
+    fig, ax = plt.subplots()
+    reldist_df = pd.DataFrame(
+    np.hstack([
+    np.vstack([relative_distances[:,0,0], np.repeat(0, points), np.repeat(1, points)]),
+    np.vstack([relative_distances[:,1,0], np.repeat(1, points), np.repeat(1, points)]),
+    np.vstack([relative_distances[:,2,0], np.repeat(2, points), np.repeat(1, points)]),
+    np.vstack([relative_distances[:,3,0], np.repeat(3, points), np.repeat(1, points)])
+    ,
+    np.vstack([relative_distances[:,0,1], np.repeat(0, points), np.repeat(2, points)]),
+    np.vstack([relative_distances[:,1,1], np.repeat(1, points), np.repeat(2, points)]),
+    np.vstack([relative_distances[:,2,1], np.repeat(2, points), np.repeat(2, points)]),
+    np.vstack([relative_distances[:,3,1], np.repeat(3, points), np.repeat(2, points)])
+    
+    ]).T, columns=['data', 'timestep', 'occluder'])
+    sns.violinplot(data=reldist_df, y='data', x='timestep', palette='GnBu_d', hue='occluder', split=True, ax=ax)
+    ax.axhline(y=relative_distances[:,0,0].mean(), xmin=0, xmax=5, color='black', linestyle='--')
+    #ax.set_title('Relative distance - unoccluded target, unoccluded occluder')
+    ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=12)
+    ax.set_ylabel('Relative distance', fontsize=12)
+    ax.set_xlabel('Time step', fontsize=12)
+    ax.legend(ax.get_legend_handles_labels()[0],['$d_{rel,1}$', '$d_{rel,2}$'],frameon=True, facecolor='white', edgecolor='white', framealpha=1.0, loc='lower left')
+    # plt.savefig('violinplot.pdf')
+    # TODO: add statistical annotation
+    from statannot import add_stat_annotation
+    add_stat_annotation(ax, data=reldist_df, x='timestep', y='data', hue='occluder',
+        box_pairs=[
+            ((2,1),(3,1)),
+            ((2,2),(3,2)),
+        ], test='t-test_ind', text_format='star', loc='inside', verbose=2)
+    plt.tight_layout()
+    plt.show()
+    
     pass
 
 def plot_softmax_output(network_output, targets, images):
@@ -1218,7 +1380,7 @@ def plot_softmax_output(network_output, targets, images):
     print('\t destroyed:\t {}, of all: {}, of false: {}, of correct_t0: {}'.format(
             len(destroyed), len(destroyed)/batchsize, np.round(len(destroyed)/(batchsize-len(correct)), 3), np.round(len(destroyed)/(len(correct_t0)), 3)))
     
-    # look at interesing cases
+    # look at interesting cases
     # -----
     
     for j in reinforced[30:30]:#range(55,60,1):
@@ -1429,9 +1591,8 @@ def plot_softmax_output(network_output, targets, images):
                         top=0.935, wspace=None, hspace=None)
     # plt.savefig('os_softmax33.ps')
     # plt.savefig('os_softmax33.pdf')
+
     plt.show()
-    
-    sys.exit()
     pass
 
 # ---------------------
