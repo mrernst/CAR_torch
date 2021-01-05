@@ -74,7 +74,7 @@ import utilities.distancemetrics as distancemetrics
 try:
     import utilities.tsne.bhtsne as bhtsne
     import utilities.tsne.tsne as tsne
-else:
+except ModuleNotFoundError:
     pass
 
 
