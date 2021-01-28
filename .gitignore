@@ -40,7 +40,6 @@ tfrecord_files
 data
 MNIST
 osmnist2r_reduced
-deprecated*
 
 # Directories that will be filled by data /3rd party tools
 experiments/*
