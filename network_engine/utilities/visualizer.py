@@ -168,11 +168,30 @@ def make_cmap(colors, position=None, bit=False):
     return cmap
 
 
+def lighten_color(color, amount=0.5):
+    """
+    Lightens the given color by multiplying (1-luminosity) by the given amount.
+    Input can be matplotlib color string, hex string, or RGB tuple.
+
+    Examples:
+    >> lighten_color('g', 0.3)
+    >> lighten_color('#F034A3', 0.6)
+    >> lighten_color((.3,.55,.1), 0.5)
+    """
+    import matplotlib.colors as mc
+    import colorsys
+    try:
+        c = mc.cnames[color]
+    except:
+        c = color
+    c = colorsys.rgb_to_hls(*mc.to_rgb(c))
+    return colorsys.hls_to_rgb(c[0], 1 - amount * (1 - c[1]), c[2])
+
 # ---------------------
 # define a 2D gaussian distribution
 # ---------------------
 
-def twoD_Gaussian(pos, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
+def full_twoD_Gaussian(pos, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
     x,y = pos
     xo = float(xo)
     yo = float(yo)    
@@ -183,7 +202,28 @@ def twoD_Gaussian(pos, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
                             + c*((y-yo)**2)))
     return g.ravel()
 
+def twoD_Gaussian(pos, amplitude, xo, yo, sigma_x, sigma_y, theta, offset):
+    x,y = pos
+    xo = float(xo)
+    yo = float(yo)    
+    a = (np.cos(theta)**2)/(2*sigma_x**2) + (np.sin(theta)**2)/(2*sigma_y**2)
+    b = -(np.sin(2*theta))/(4*sigma_x**2) + (np.sin(2*theta))/(4*sigma_y**2)
+    c = (np.sin(theta)**2)/(2*sigma_x**2) + (np.cos(theta)**2)/(2*sigma_y**2)
+    g = offset + np.abs(amplitude)*np.exp( - (a*((x-xo)**2) + 2*b*(x-xo)*(y-yo) 
+                            + c*((y-yo)**2)))
+    return g.ravel()
+    
 
+def plot_distribution(measure, ax, lab=None, xlabel=''):
+    sns.distplot(measure, fit=st.norm, kde=False, label=lab, ax=ax)
+    ax.set_xlabel(xlabel)
+    ax.set_ylabel('Probability density')
+    ax.axvline(x=measure.mean(),
+        ymin=0.0, ymax = 5, linewidth=1, color='gray')
+    ax.axvline(x=measure.mean()-measure.std(),
+        ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
+    ax.axvline(x=measure.mean()+measure.std(),
+        ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
 # ---------------------
 # make custom image annotations
 # ---------------------
@@ -483,6 +523,41 @@ def plot_classes_preds(output, images, labels, classes):
 # class activation mapping
 # -----------------
 
+def quantify_pixel_importance(cams, preds, percentage=0.25):
+    b,t,n_classes,h,w = cams.shape
+    
+    
+    # normalize cams to a probability distribution over pixels
+    # -----
+    # offset by minimum of each upsampled activation map
+    min_val, min_args = torch.min(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams -= torch.unsqueeze(min_val, dim=-1)
+    # normalize by the sum of each upsampled activation map
+    sum_val = torch.sum(cams, dim=[-2,-1], keepdim=True)
+    cams /= sum_val
+    
+    pixel_array = []
+    for timestep in range(t):
+        pixels_per_timestep = []
+        for batch in range(b):
+            pixels = cams[batch, timestep, preds[batch, timestep, 0],:,:].view(h*w)
+            pixels = torch.cumsum(torch.sort(pixels, 0, descending=True)[0], 0)
+            pixels = np.argmax(pixels>percentage)
+            pixels_per_timestep.append(pixels)
+        pixels_per_timestep = torch.stack(pixels_per_timestep, 0)
+        pixel_array.append(pixels_per_timestep)
+    pixel_array = np.array(torch.stack(pixel_array, dim=1))
+    print(np.mean(pixel_array,0))
+    
+    fig, ax = plt.subplots()
+    for timestep in range(t):
+        plot_distribution(pixel_array[:,timestep], ax, lab='$t={}$'.format(timestep))
+    ax.legend()
+    ax.set_title('pixels accounting for {}% classification mass'.format(int(percentage*100)))
+    plt.show()
+
+
+    pass
 
 
 def saliencymap_to_figure(smap, pic, alpha=0.5):
@@ -516,8 +591,6 @@ def show_cam_samples(cams, pics, targets, probs, preds, alpha=0.5, n_samples=5):
     alpha                      Transparency of the heatmap overlay
     """
     
-    from mpl_toolkits.axes_grid1 import make_axes_locatable
-
     b,t,c,h,w = pics.shape
    
     all_cams = cams
@@ -572,7 +645,7 @@ def show_cam_samples(cams, pics, targets, probs, preds, alpha=0.5, n_samples=5):
         axes[1, -1].axis('off')
         divider = make_axes_locatable(axes[1,-1])
         cax = divider.append_axes("right", size="5%", pad=0.05)
-        plt.colorbar(im, cax=cax)
+        cbar = plt.colorbar(im, cax=cax)
     
         for i in range(t):
             axes[2,i].imshow(pics[i,0,:,:], cmap="Greys")
@@ -620,7 +693,10 @@ def show_cam_means(cams, targets, probs, preds):
     
     b,t,n_classes,h,w = cams.shape
     
-    # topk output
+    # prepare real data according to different properties
+    # i.e. target prediction, current prediction, final prediction
+    
+    # topk output (current)
     uber_cam = []
     for timestep in range(t):
         topk_cam = []
@@ -630,7 +706,7 @@ def show_cam_means(cams, targets, probs, preds):
         uber_cam.append(topk_cam)
     cams1 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
     
-    # last predicition evolution
+    # last prediction evolution (final)
     uber_cam = []
     for timestep in range(t):
         topk_cam = []
@@ -640,7 +716,7 @@ def show_cam_means(cams, targets, probs, preds):
         uber_cam.append(topk_cam)
     cams2 = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
     
-    # target evolution
+    # target evolution (target)
     uber_cam = []
     for timestep in range(t):
         topk_cam = []
@@ -718,16 +794,282 @@ def show_cam_means(cams, targets, probs, preds):
     plt.show()
     pass
     
-def plot_cam_samples(cams, pics, targets, probs, preds):
-    show_cam_samples(cams, pics, targets, probs, preds)
-    list_of_indices = [1,2,3]
+def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[1,23,35], alpha=0.5):
+    """
+    cams (b,t,n_classes,h,w)   Class Activation Maps
+    pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
+    targets (b,n_occ)          NHot Target Vectors
+    probs (b,t,topk)           Probabilities for Each output
+    preds (b,t,topk)           Predictions of the Network
+    alpha                      Transparency of the heatmap overlay
+    """    
+    b,t,n_classes,h,w = cams.shape
+    n_rows = len(list_of_indices)
+    # Create x and y indices for gaussian2D data
+    x = np.linspace(0, 31, 32)
+    y = np.linspace(0, 31, 32)
+    x, y = np.meshgrid(x, y)
+    n_hot_targets = targets if len(targets.shape) > 1 else torch.stack([targets,targets,targets],-1)
+    targets = targets[:,0] if len(targets.shape) > 1 else targets
     
-    pass
+    # normalize cams to 0,1
+    # -----
+    # offset by minimum of each upsampled activation map
+    min_val, min_args = torch.min(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams -= torch.unsqueeze(min_val, dim=-1)
+    # divide by the maximum of each activation map
+    max_val, max_args = torch.max(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams /= torch.unsqueeze(max_val, dim=-1)
+
+
+
+    fig, ax = plt.subplots(n_rows,t+1)
+
+    for row,ind in enumerate(list_of_indices):
+        for ti in range(t):
+            ax[row,ti].imshow(pics[ind,ti,0,:,:], cmap="Greys")
+            min, max = (cams[ind,ti,preds[ind,ti,0],:,:]).min(), (cams[ind,ti,preds[ind,ti,0],:,:]).max()
+            min, max = 0.0, 1.0
+            im = ax[row,ti].imshow(cams[ind,ti,preds[ind,ti,0],:,:], cmap="rocket",    alpha=alpha, interpolation='nearest', vmin=min, vmax=max)
+            ax[row,ti].set_xlabel('{}|{} [{},{}]'.format(preds[ind,ti,0], n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2]))
+            ax[row,ti].set_yticks([])
+            ax[row,ti].set_xticks([])
+            
+            initial_guess = (5.,16,16,5,5,0.,10.)
+            cdat = cams[ind,ti,preds[ind,ti,0],:,:].numpy()
+            x_init, y_init = np.where(cdat == np.amax(cdat))  
+            initial_guess_2 = (np.amax(cdat),x_init[0],y_init[0],1,1,0.,3.)
+            popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.reshape(cams[ind,ti,preds[ind,ti,0],:,:],h*w), p0=initial_guess, maxfev=50000)
+            ax[row,ti].contour(x, y, (twoD_Gaussian((x, y), *popt)).reshape(32, 32), [.35,.4,.45,.5], colors='w',linewidths=.5)
+        divider = make_axes_locatable(ax[row,-2])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = fig.colorbar(im, cax=cax, ticks=[min, (min+max)/2., max])
+        cax.tick_params(axis='both', which='major', labelsize=7)
+        # enlarge axis by 5%
+        box = ax[row,-2].get_position()
+        ax[row,-2].set_position([box.x0, box.y0, box.width * 1.07, box.height * 1.07])
+        
+        # Delta T Plot
+        ax[row, -1].imshow(pics[ind,-1,0,:,:], cmap="Greys")
+        min, max = (cams[ind,-1,preds[ind,-1,0],:,:] - cams[ind,0,preds[ind,0,0],:,:]).min(), (cams[ind,-1,preds[ind,-1,0],:,:] - cams[ind,0,preds[ind,0,0],:,:]).max()
+        min, max = -0.5, +0.5
+        # zero_pos = (-min) / (-min + max)
+        # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+        im = ax[row, -1].imshow(cams[ind,-1,preds[ind,-1,0],:,:] - cams[ind,0,preds[ind,0,0],:,:], cmap="icefire", alpha=alpha, interpolation='nearest', vmin=-max, vmax=max)
+        divider = make_axes_locatable(ax[row,-1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = fig.colorbar(im, cax=cax, ticks=[min, (min+max)/2., max])
+        cax.tick_params(axis='both', which='major', labelsize=7)
+        # enlarge axis by 5%
+        box = ax[row,-1].get_position()
+        ax[row,-1].set_position([box.x0 + 0.025, box.y0, box.width * 1.07, box.height * 1.07])
+        ax[row,-1].set_yticks([])
+        ax[row,-1].set_xticks([])
+        
+
+    
+    for ti in range(t):
+        ax[0,ti].annotate('$t_{}$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+        fontsize=9, ha='center', va='bottom',
+        bbox=dict(boxstyle='square', fc='white', ec='white'),
+        arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0))
+    ax[0,-1].annotate('$\Delta t$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+    fontsize=9, ha='center', va='bottom',
+    bbox=dict(boxstyle='square', fc='white', ec='white'),
+    arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0))
+    
+    ax_in = ax[0,1]
+
+    ax[0,0].annotate('A', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,-12]), weight='bold', fontsize=24)
+
+
+    #plt.subplots_adjust(left = 0.05)
+    plt.show()
+     
 
 def plot_cam_means(cams, targets, probs, preds):
-    show_cam_means(cams, targets, probs, preds)  
-    pass
+    b,t,n_classes,h,w = cams.shape
+    n_rows = 3
+    # Create x and y indices for gaussian2D data
+    x = np.linspace(0, 31, 32)
+    y = np.linspace(0, 31, 32)
+    x, y = np.meshgrid(x, y)
+    
+    quantify_pixel_importance(cams, preds, percentage=0.1)
+    quantify_pixel_importance(cams, preds, percentage=0.25)
+    quantify_pixel_importance(cams, preds, percentage=0.5)
+    quantify_pixel_importance(cams, preds, percentage=0.75)
 
+    # normalize cams to 0,1
+    # -----
+    # offset by minimum of each upsampled activation map
+    min_val, min_args = torch.min(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams -= torch.unsqueeze(min_val, dim=-1)
+    # divide by the maximum of each activation map
+    max_val, max_args = torch.max(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams /= torch.unsqueeze(max_val, dim=-1)
+    
+    # prepare real data according to different properties
+    # i.e. target prediction, current prediction, final prediction
+    
+    # topk output (current)
+    uber_cam = []
+    for timestep in range(t):
+        topk_cam = []
+        for batch in range(b):
+            topk_cam.append(cams[batch, timestep, preds[batch, timestep, 0],:,:])
+        topk_cam = torch.stack(topk_cam, 0)
+        uber_cam.append(topk_cam)
+    #cams_current = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
+    cams_current = torch.stack(uber_cam, dim=1)
+    
+    
+    # last prediction evolution (final)
+    uber_cam = []
+    for timestep in range(t):
+        topk_cam = []
+        for batch in range(b):
+            topk_cam.append(cams[batch, timestep, preds[batch, -1, 0],:,:])
+        topk_cam = torch.stack(topk_cam, 0)
+        uber_cam.append(topk_cam)
+    #cams_final = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
+    cams_final = torch.stack(uber_cam, dim=1)
+    
+    
+    # target evolution (target)
+    uber_cam = []
+    for timestep in range(t):
+        topk_cam = []
+        for batch in range(b):
+            topk_cam.append(cams[batch, timestep, targets[batch],:,:])
+        topk_cam = torch.stack(topk_cam, 0)
+        uber_cam.append(topk_cam)
+    #cams_last = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
+    cams_target = torch.stack(uber_cam, dim=1)
+    
+    cams_by_row = [cams_current, cams_final, cams_target]
+    
+    fig, ax = plt.subplots(n_rows, t+1)
+    for row in range(n_rows):
+        dict_of_metric = {}
+        popt_list = []
+        for ti in range(t):
+            dict_of_metric[ti] = []
+            list_of_data = []
+            list_of_fitted_data = []
+            initial_guess = (3.,15,14,5,5,0.,10.) # handcrafted parameters
+            for j in range(b):
+                #data = twoD_Gaussian((x, y), 3, 16, 16, 6 - ti*1.5, 4 - ti*1.5, np.pi/4, 10)
+                #data_noisy = (data + 0.5*np.random.normal(size=data.shape))
+                
+                # insert real data here
+                data_noisy = cams_by_row[row][j,ti,:,:].numpy()
+                x_init, y_init = np.where(data_noisy == np.amax(data_noisy))   
+                initial_guess_2 = (np.amax(data_noisy),x_init[0],y_init[0],5,5,0.,10.)
+                data_noisy = np.reshape(data_noisy,h*w)
+                list_of_data.append(data_noisy)
+                try:
+                    popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess, maxfev=50000)
+                except RuntimeError:
+                    print('[INFO] RuntimeError, reset initial guess')
+                    #plt.imshow(np.reshape(data_noisy,[32,32]))
+                    #plt.show()
+                    popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess_2, maxfev=50000)
+                popt_list.append(popt)
+                initial_guess = popt
+                # decide whether the metic is supposed to be the maximum or the intermediate
+                dict_of_metric[ti].append(np.sqrt(popt[3]**2 + popt[4]**2))
+                #dict_of_metric[ti].append(max(popt[3], popt[4]))
+            for popt in popt_list:
+                list_of_fitted_data.append(twoD_Gaussian((x, y), *popt))
+            popt_list = []
+    
+            ax[row,ti].imshow(np.mean(list_of_data,0).reshape(32, 32), cmap="rocket", origin='lower',
+                extent=(x.min(), x.max(), y.min(), y.max()))
+            ax[row,ti].contour(x, y, np.mean(list_of_fitted_data,0).reshape(32, 32), [.35,.4,.45,.5], colors='gray',linewidths=.25, linestyles='dashed')
+            
+            popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.mean(list_of_data,0), p0=(1.,15,14,1,1,0.,3.), maxfev=50000)
+            ax[row,ti].contour(x, y, (twoD_Gaussian((x, y), *popt)).reshape(32, 32), [.35,.4,.45,.5], colors='w',linewidths=.25)
+
+            #ax[row,ti].axis('off')
+            ax[row,ti].set_yticks([])
+            ax[row,ti].set_xticks([])
+            
+            ax[0,0].set_ylabel('current')
+            ax[1,0].set_ylabel('final') 
+            ax[2,0].set_ylabel('target')
+            
+            ax[0,ti].annotate('$t_{}$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+                        fontsize=9, ha='center', va='bottom',
+                        bbox=dict(boxstyle='square', fc='white', ec='white'),
+                        arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0))    
+            
+            #print(row, ti)
+        
+        
+        for ti in range(t):
+        # T-Test mit Bonferroni Korrektur nach Benjamini Hochberg
+    
+            qstar = 0.05
+            pval = np.ones([t, t])
+            stval = np.ones([t, t])
+            significance_table = np.zeros([t, t])
+            for k in range(t):
+                for j in range(t):
+                    if k != j and k > j:
+                        stval[k, j], pval[k, j] = st.ttest_ind(dict_of_metric[k], dict_of_metric[j])
+    
+            #print(np.round(pval, 4))
+            #print(np.round(stval, 4))
+    
+            sorted_pvals = np.sort(pval[pval < 1])
+            bjq = np.arange(1, len(sorted_pvals) + 1) / \
+                len(sorted_pvals) * qstar
+    
+            for k in range(t):
+                for j in range(t):
+                    if k != j and k > j:
+                        if pval[k, j] in sorted_pvals[sorted_pvals - bjq <= 0]:
+                            significance_table[k, j] = 1
+                        else:
+                            significance_table[k, j] = 0
+    
+    
+    
+            # Shrink current axis by 20%
+            box = ax[row,-1].get_position()
+            ax[row,-1].set_position([box.x0 + 0.01, box.y0 + 0.02, box.width * 0.8, box.height * 0.8])
+        
+            #ax = plt.axes([0.75, 0.5, .10, .10])
+            ax[row,-1].set_zorder(-1)
+            ax[row,-1].matshow(significance_table, cmap='Greys')
+    
+            ax[row,-1].set_xticklabels(['','$t_0$','$t_1$','$t_2$'], fontsize=7)#fontsize=65)
+            ax[row,-1].tick_params(labelbottom=True, labeltop=False,
+                          right=False, top=False)
+            ax[row,-1].set_yticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=7)#fontsize=65)
+            ax[row,-1].set_xlim([-0.5, t - 1 - 0.5])
+            ax[row,-1].set_ylim([t - 0.5, -0.5 + 1])
+            ax[row,-1].spines['top'].set_visible(False)
+            ax[row,-1].spines['right'].set_visible(False)
+    
+    ax[-1,-1].add_patch(patches.Rectangle((0.0, 2.5+4), 1, 1, fill='black',
+                           color='black', alpha=1, clip_on=False))
+    
+    ax[-1,-1].text(0.0, 6.4 - 1.0+4, 'Significant difference \n(two-sided t-test, \nexpected FDR=0.05)',
+            fontsize=7, horizontalalignment='left',
+            verticalalignment='center')
+    
+    # Create a Rectangle patch
+    ax_in = ax[0,1]
+    
+    rect = patches.Rectangle((ax_in.get_xlim()[0],ax_in.get_ylim()[0]),ax_in.get_xlim()[1]-ax_in.get_xlim()[0],ax_in.get_ylim()[1]-ax_in.get_ylim()[0],linewidth=1,edgecolor='black',facecolor='none')
+    # Add the patch to the Axes
+    ax[0,0].add_patch(rect)
+    # Annotate
+    ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,+12]), weight='bold', fontsize=24)
+    
+    plt.show()
 
 
 # -----------------
@@ -1026,7 +1368,7 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
     # plt.show()
 
 
-    # start of the top plots
+    # start of the plots
     # -----
     
     # shift data according to timestep
@@ -1036,8 +1378,7 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
         x_data_u[:,ti] = x_data_u[:,ti] + ti * x_spread*6
         x_data_uc[:,ti] = x_data_uc[:,ti] + ti * x_spread*6
 
-
-    
+        
     fig, axes = plt.subplots(2,2, sharex=False, sharey=False, figsize=(18,6))
     for pltnr, ax in enumerate([axes[0,0],axes[0,1]]):
         for ti in range(time):
@@ -1198,26 +1539,243 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
     
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.3)
     plt.show()
-
     pass
+
+
+def plot_tsne_evolution2(representations, imgs, targets, show_stimuli=False, show_indices=False, N='all', savefile='./../trained_models/tsnesave', overwrite=False):
+    
+    # hack to mitigate output
+    from matplotlib.axes._axes import _log as matplotlib_axes_logger
+    matplotlib_axes_logger.setLevel('ERROR')
+    
+     
+    # Constants, maybe become variables later
+    N_UNOCC = 1000
+    
+    targets = targets.numpy()
+    classes = [0,1,2,3,4,5,6,7,8,9]    
+
+    markers = ["o","v","s","D","H"]
+    # same markers for all timesteps
+    markers = ["o","o","o","o","o"]
+    
+    markersizes = [10,10] #[10,30]
+    alpha=1.0
+    colors = sns.color_palette("colorblind", len(classes))
+    points,time,feature,height,width = representations.shape
+    
+    
+    representations = representations.view(points,time,-1)
+    
+
+    # learn tsne embedding
+    # -----
+    
+    
+    # we calculate tsne for each timestep seperately
+    if os.path.exists(savefile + '.npy'):
+        projection = np.load(savefile + '.npy')
+        print('[INFO] Loaded tsne-file at {}'.format(savefile))
+    else:
+        projection = np.zeros([1])
+    if (projection.shape[0] == 1) or overwrite:
+        projection = np.zeros([points, time, 2])
+        for ti in range(time):
+            time_rep = representations[:,ti,:].numpy()
+            projected_data = bhtsne.run_bh_tsne(time_rep, no_dims=2, perplexity=25, verbose=True, use_pca=False, initial_dims=time_rep[-1], max_iter=1000) #10000
+            projection[:,ti,:] = projected_data
+        np.save(savefile + '.npy', projection)
+        np.save(savefile + '_targets.npy', targets)
+    else:
+        targets = np.load(savefile + '_targets.npy')
+        
+
+    
+    projected_data = projection
+    
+    x_data = projected_data[:-N_UNOCC,:,0] # (index, time)
+    y_data = projected_data[:-N_UNOCC,:,1] # (index, time)
+    tar = targets[:-N_UNOCC]
+    
+    x_data_u = projected_data[-N_UNOCC:,:,0] # (index, time)
+    y_data_u = projected_data[-N_UNOCC:,:,1] # (index, time)
+    tar_u = targets[-N_UNOCC:]
+    
+    # calculate unoccluded centroids
+    
+    x_data_uc = np.zeros([len(classes),time])
+    y_data_uc = np.zeros([len(classes), time])
+    tar_uc = np.zeros(len(classes))
+    for ti in range(time): 
+        for (i, cla) in enumerate(classes):
+            x_data_uc[i,ti] = np.mean([p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla])
+            y_data_uc[i,ti]= np.mean([p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla])
+            tar_uc[i] = cla
+
+    # start of the plots
+    # -----
+    
+    # shift data according to timestep
+    x_spread = x_data.std()
+    for ti in range(time):
+        x_data[:,ti] = x_data[:,ti] + ti * x_spread*6 #6
+        x_data_u[:,ti] = x_data_u[:,ti] + ti * x_spread*6
+        x_data_uc[:,ti] = x_data_uc[:,ti] + ti * x_spread*6
+
+        
+    fig, axes = plt.subplots(3,1, sharex=False, sharey=False, figsize=(9,6))
+    for pltnr, ax in enumerate([axes[0],axes[1]]):
+        for ti in range(time):
+            for (i, cla) in enumerate(classes):
+                xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
+                yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
+                ax.scatter(xc,yc,c=colors[i], label=str(int(cla)), marker=markers[ti], alpha=alpha, s=markersizes[pltnr])
+        
+        ax.axis('off')
+    
+    # only second plot gets the unoccluded markers
+    # unoccluded trajectories
+    for ti in range(time): 
+        for (i, cla) in enumerate(classes):
+            xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
+            ax.scatter(xc,yc,c=colors[i], marker=markers[ti], alpha=alpha, s=markersizes[pltnr], edgecolor='black', linewidth=0.5)
+    
+    # start of the bottom plots
+    # -----
+    
+    grays = ['lightgray'] * len(classes)
+    fills = ['none'] * len(classes)
+    colorset = [sns.color_palette("colorblind", len(classes)), sns.color_palette(grays)]
+    marker_fills = [fills,fills]
+    allhighlights = [[3,8],[3]]
+    
+    for pltnr in range(len(allhighlights)):
+        for hl in allhighlights[pltnr]:
+            colorset[pltnr][hl] = colors[hl]
+            marker_fills[pltnr][hl] = 'full'
+    
+    for pltnr, ax in enumerate([axes[2]]):       
+        if N=='all':
+            n_indices = range(len(projected_data))
+        elif isinstance(N, int):
+            min_N_ind = N//len(set(targets))
+            n_indices = []
+            for cla in classes:
+                ind = np.where(tar == cla)[0]
+                n_indices += list(np.random.choice(ind, min(min_N_ind, len(ind)), replace=False))
+            n_indices += list(np.random.randint(0,len(projected_data)-N_UNOCC,N-len(n_indices)))
+            n_indices = np.array(n_indices)
+        elif (pltnr==1):
+            n_indices = [N[-1]]
+        else:
+            n_indices = N[:-1]
+            
+        
+        if show_stimuli:
+            artists = []
+            for ti in range(time):
+                for x0, y0, i in zip(projected_data[:,ti,0][n_indices], projected_data[:,ti,1][n_indices], n_indices):
+                    # adapt the center of arrows intelligently
+                    if ((y0 < 0) and (x0>5)) :
+                        xc,yc = x0-5,y0+25 #x0+10,y0+20
+                    elif ((y0 < 0) and (x0<5)):
+                        xc,yc = x0-5,y0+40
+                    elif (y0 > 0):
+                        xc,yc = x0-20,y0-30
+                    else:
+                        xc,yc = x0,y0
+                    
+                    #calculate scaling factor c
+                    c = np.sqrt((1800./(xc**2 + yc**2))) # (-30., 30.)
+                  
+                    ab = offsetbox.AnnotationBbox(makeMarker(imgs[i,ti,0], zoom=0.65*32./len(imgs[i,ti,0])), (x0, y0), xybox=(c*xc, c*yc), xycoords='data', boxcoords="offset points",
+                                      pad=0.3,bboxprops=dict(color=colorset[pltnr][int(targets[i])]) , arrowprops=dict(arrowstyle=patches.ArrowStyle("->", head_length=.2, head_width=.1)), frameon=True)
+                    # ab2 = offsetbox.AnnotationBbox(makeMarker(tile_tensor_lowres[i], zoom=0.65*32./len(tile_tensor_lowres[i])), (x0, y0), xybox=(c*xc-30, c*yc), xycoords='data', boxcoords="offset points",
+                    #                   pad=0.3,bboxprops=dict(color=colorset[pltnr][int(all_classes[i])]), frameon=True)
+                  
+                    if show_indices:
+                        ax.annotate('{}'.format(i), xy=(x0, y0), xytext=(x0, y0), zorder=-1)
+                    if len(n_indices) >= 25:
+                        ab.zorder=-1
+                    
+                    artists.append(ax.add_artist(ab))
+                    # if i == 622:
+                    #   artists.append(ax.add_artist(ab2))
+        ax.axis('off')
+    
+        
+    ax, pltnr = axes[2], 1
+    for ti in range(time):
+        for (i, cla) in enumerate(classes):
+            # rest of the data
+            xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][cla], marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][cla]), alpha=alpha, s=markersizes[0])  
+            # unoccluded data
+            # xc = [p for (j,p) in enumerate(x_data_u[:,ti]) if tar_u[j]==cla]
+            # yc = [p for (j,p) in enumerate(y_data_u[:,ti]) if tar_u[j]==cla]
+            # ax.scatter(xc,yc,c=colorset[pltnr][i], label=str(int(cla)), marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][i]), alpha=alpha, s=markersizes[0])
+            # unoccluded centroids
+            xc = [p for (j,p) in enumerate(x_data_uc[:,ti]) if tar_uc[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data_uc[:,ti]) if tar_uc[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][cla], marker=markers[ti], alpha=alpha, s=markersizes[pltnr], edgecolor='black', linewidth=0.5, zorder=99)
+        for (i, cla) in enumerate(allhighlights[pltnr]):
+            # rest of the data
+            xc = [p for (j,p) in enumerate(x_data[:,ti]) if tar[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data[:,ti]) if tar[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][cla], marker=MarkerStyle(marker=markers[ti], fillstyle=marker_fills[pltnr][cla]), alpha=alpha, s=markersizes[0])
+            # unoccluded centroids
+            xc = [p for (j,p) in enumerate(x_data_uc[:,ti]) if tar_uc[j]==cla]
+            yc = [p for (j,p) in enumerate(y_data_uc[:,ti]) if tar_uc[j]==cla]
+            ax.scatter(xc,yc,c=colorset[pltnr][cla], marker=markers[ti], alpha=alpha, s=markersizes[pltnr], edgecolor='black', linewidth=0.5)
+            
+  
+    
+    # general setup
+    
+    handles, labels = axes[0].get_legend_handles_labels()
+    handles = handles[:10]
+    labels = labels[:10]
+
+    axes[0].legend(handles, labels, title='class label', loc='center left', bbox_to_anchor=(1, 0), frameon=False)
+    bottom, top = plt.ylim()
+    
+    for ti in range(time):
+        bracket_ypos = 1.06*y_data.max()
+        data_cloud = np.concatenate([x_data[:,ti], x_data_u[:,ti]])
+        bracket_xpos = data_cloud.mean()
+        bracket_width = data_cloud.std()/3
+        axes[0].annotate('$t_{}$'.format(ti), xy=(bracket_xpos, bracket_ypos), xytext=(bracket_xpos, bracket_ypos), xycoords='data', 
+        fontsize=9, ha='center', va='bottom',
+        bbox=dict(boxstyle='square', fc='white', ec='white'),
+        arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(bracket_width), lw=1.0))
+        
+    
+    
+    
+    axes[0].set_ylabel('t-SNE dimension 1')
+    axes[1].set_ylabel('t-SNE dimension 1')
+    axes[2].set_ylabel('t-SNE dimension 1')
+    axes[2].set_xlabel('t-SNE dimension 2')
+    
+    
+    for n, ax in enumerate(axes.flatten()):
+        ax.text(-0.1, 1.05, string.ascii_uppercase[n], weight='bold', transform=ax.transAxes, size=18)
+    
+    plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.3)
+    plt.show()
+    pass
+
+
+
 
 def plot_relative_distances(representations, nhot_targets, representations_unocc, onehot_targets_unocc):
     
     classes = 10
     n_occ = 2
 
-    def plot_distribution(measure, ax, lab=None, xlabel=''):
-        sns.distplot(measure, fit=st.norm, kde=False, label=lab, ax=ax)
-        ax.set_xlabel(xlabel)
-        ax.set_ylabel('Probability density')
-        ax.axvline(x=measure.mean(),
-            ymin=0.0, ymax = 5, linewidth=1, color='gray')
-        ax.axvline(x=measure.mean()-measure.std(),
-            ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
-        ax.axvline(x=measure.mean()+measure.std(),
-            ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
-    
-    
+        
     points,time,feature,height,width = representations.shape
     representations = representations.view(points,time,-1).numpy()
     representations_unocc = representations_unocc.view(points,time,-1).numpy()
@@ -1275,6 +1833,7 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     ax.legend()
     ax.set_title('relative distance target, occluder 2')
     # plt.savefig('B.pdf')
+    ax.annotate('B', xy=(ax.get_xlim()[0],ax.get_ylim()[1]), xytext=np.array([ax.get_xlim()[0],ax.get_ylim()[1]])+np.array([-7,+2]), weight='bold', fontsize=24)
     plt.show()
     
 
@@ -1310,7 +1869,7 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     np.vstack([relative_distances[:,3,1], np.repeat(3, points), np.repeat(2, points)])
     
     ]).T, columns=['data', 'timestep', 'occluder'])
-    sns.violinplot(data=reldist_df, y='data', x='timestep', palette='GnBu_d', hue='occluder', split=True, ax=ax)
+    sns.violinplot(data=reldist_df, y='data', x='timestep', palette='Greys', hue='occluder', split=True, ax=ax)
     ax.axhline(y=relative_distances[:,0,0].mean(), xmin=0, xmax=5, color='black', linestyle='--')
     #ax.set_title('Relative distance - unoccluded target, unoccluded occluder')
     ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=12)
@@ -1431,10 +1990,14 @@ def plot_softmax_output(network_output, targets, images):
             mean_output[cla, :, :] = 0
             error_output[cla, :, :] = 0
 
+    lstylist = ['-', '--', ':', '-.']
+    markerlist = ['o', 'v', 's', 'D']
+    fillstylelist = ['full', 'full', 'full', 'full']
+    
     fig, axes = plt.subplots(2, 5, sharex=True, sharey=True, figsize=(14, 5))
     for j, ax in enumerate(axes.flatten()):
         for ti in range(time):
-            ax.plot(mean_output[j, ti, :], label='$t_{}$'.format(ti))
+            ax.plot(mean_output[j, ti, :], label='$t_{}$'.format(ti), marker=markerlist[ti], markersize=3)
             ax.fill_between(np.arange(
                 0, classes, 1), mean_output[j, ti, :] + error_output[j, ti, :], mean_output[j, ti, :] - error_output[j, ti, :], alpha=0.25)
 
@@ -1451,8 +2014,9 @@ def plot_softmax_output(network_output, targets, images):
                       framealpha=1.0, bbox_to_anchor=(1.0, .8), loc='center left')
 
     plt.xticks(np.arange(0, classes, step=classes//10))
-    plt.suptitle('Mean softmax output over candidates for each target')
+    #plt.suptitle('Mean softmax output over candidates for each target')
     #plt.savefig('mean_softmax.pdf')
+    axes[0,0].annotate('B', xy=(axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]), xytext=np.array([axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]])+np.array([-7,+2]), weight='bold', fontsize=24)
     plt.show()
     
     
@@ -1460,7 +2024,7 @@ def plot_softmax_output(network_output, targets, images):
     for j, ax in enumerate(axes.flatten()):
         j += 150
         for ti in range(time):
-            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(ti), color=colors[ti])
+            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(ti), color=colors[ti], marker=markerlist[ti], markersize=3)
 
         ax.set_yscale('log')
         ax.set_ylim([1e-9, 5])
@@ -1548,49 +2112,35 @@ def plot_softmax_output(network_output, targets, images):
     plt.show()
     
     
-    candlist = [87, 128, 206]
-    candlist2 = [24, 33, 29]
+    candlist = [87, 128, 206, 24, 33]
 
-    fig, axes = plt.subplots(2, 3, sharex=False, sharey='row', figsize=(12, 8))
+    fig, axes = plt.subplots(1, 5, sharex=False, sharey='row', figsize=(14, 2.5))
 
-    for j, ax in zip(candlist, axes[0]):
+    for j, ax in zip(candlist, axes):
         for ti in range(time):
             ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(
-                ti), linewidth=3, marker=markerlist[ti], markersize=7.0, fillstyle=fillstylelist[ti], color=colors[ti])
+                ti), marker=markerlist[ti], markersize=3.0, fillstyle=fillstylelist[ti], color=colors[ti])
 
         ax.set_yscale('log')
         ax.set_ylim([1e-10, 5])
-        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.6), (.805, .16), xycoords='axes fraction', boxcoords="offset points",
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.2), (.805, .16), xycoords='axes fraction', boxcoords="offset points",
                                       pad=0.3, frameon=True)
         ax.axvline(x=targets[j], ymin=0,
-                   ymax=2, color='black', linestyle='--', linewidth=2)
+                   ymax=2, color='black', linestyle='--')
         ax.add_artist(ab)
         ax.set_xticks(np.arange(0, classes, step=classes//10))
-    for j, ax in zip(candlist2, axes[1]):
-        for ti in range(time):
-            ax.plot(softmax_output[j, ti, :], label='$t_{}$'.format(
-                ti), linewidth=3, marker=markerlist[ti], markersize=7.0, fillstyle=fillstylelist[ti], color=colors[ti])
+        ax.set_xlabel('Class')
 
-        ax.set_yscale('log')
-        ax.set_ylim([1e-10, 5])
-        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.6), (.805, .16), xycoords='axes fraction', boxcoords="offset points",
-                                      pad=0.3, frameon=True)
-        ax.axvline(x=targets[j], ymin=0,
-                   ymax=2, color='black', linestyle='--', linewidth=2)
-        ax.add_artist(ab)
-        ax.set_xticks(np.arange(0, classes, step=classes//10))
 
-        ax.set_xlabel('Class label')
-
-    axes[0, 2].legend(frameon=True, facecolor='white', edgecolor='white', framealpha=1.0,
+    axes[4].legend(frameon=True, facecolor='white', edgecolor='white', framealpha=1.0,
                       bbox_to_anchor=(1., .725), loc='center left', title='time step')
-    axes[0, 0].set_ylabel('Softmax output')
-    axes[1, 0].set_ylabel('Softmax output')
+    axes[0].set_ylabel('Softmax output')
 
-    axes[0, 0].text(-0.38, 1.03, 'A', weight='bold',
-                    transform=axes[0, 0].transAxes, size=40)
-    plt.subplots_adjust(left=None, bottom=None, right=0.88,
-                        top=0.935, wspace=None, hspace=None)
+
+    axes[0].annotate('A', xy=(axes[0].get_xlim()[0],axes[0].get_ylim()[1]), xytext=np.array([axes[0].get_xlim()[0],axes[0].get_ylim()[1]])+np.array([-7,+2]), weight='bold', fontsize=24)
+
+    plt.subplots_adjust(left=None, bottom=0.15, right=None,
+                        top=0.85, wspace=None, hspace=None)
     # plt.savefig('os_softmax33.ps')
     # plt.savefig('os_softmax33.pdf')
 
