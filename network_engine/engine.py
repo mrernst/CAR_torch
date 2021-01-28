@@ -312,7 +312,7 @@ def evaluate_recurrent(dataset, network, batch_size, criterion, timesteps, stere
     return evaluation_data, embedding_data
 
 
-def generate_class_activation(test_loader, network, timesteps, stereo, max_iteration=50):
+def generate_class_activation(test_loader, network, timesteps, stereo):
     cam = CAM(network)
     loss = 0
     accuracy = 0
@@ -342,9 +342,6 @@ def generate_class_activation(test_loader, network, timesteps, stereo, max_itera
             output_list.append(outputs)
             topk_prob_list.append(topk_prob)
             topk_pred_list.append(topk_pred)
-            
-            if i > max_iteration:
-                break
     
     class_activations = torch.cat(cam_list, dim=0)
     inputs = torch.cat(input_list, dim=0)
@@ -652,8 +649,8 @@ if FLAGS.testrun:
         )
 
     rep_sample = list(np.random.choice(range(len(test_dataset)), size=SIZE, replace=False)) 
-    test_dataset = torch.utils.data.Subset(test_dataset, rep_sample)
-    test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
+    test_subset = torch.utils.data.Subset(test_dataset, rep_sample)
+    test_loader = torch.utils.data.DataLoader(test_subset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
 
     feat, img, tar, out = generate_hidden_representation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
@@ -668,8 +665,8 @@ if FLAGS.testrun:
         transform=test_transform
         )
     
-    test_dataset_unoccluded = torch.utils.data.Subset(test_dataset_unoccluded, rep_sample)
-    test_loader_unoccluded = torch.utils.data.DataLoader(test_dataset_unoccluded, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
+    test_subset_unoccluded = torch.utils.data.Subset(test_dataset_unoccluded, rep_sample)
+    test_loader_unoccluded = torch.utils.data.DataLoader(test_subset_unoccluded, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
     
     featu, imgu, taru, _ = generate_hidden_representation(test_loader_unoccluded, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
@@ -678,39 +675,47 @@ if FLAGS.testrun:
     
     # hand the date to the visualization functions
     # -----
-    # visualizer.plot_tsne_evolution(
+    # visualizer.plot_tsne_evolution2(
     #     torch.cat([feat,featu], dim=0),
     #     torch.cat([img,imgu], dim=0),
     #     torch.cat([tar[:,0],taru], dim=0),
     #     overwrite=False)
-    #visualizer.plot_softmax_output(out, tar[:,0], img)    
-    #visualizer.plot_relative_distances(feat, tar, featu, taru)
+    # visualizer.plot_softmax_output(out, tar[:,0], img)    
+    # visualizer.plot_relative_distances(feat, tar, featu, taru)
     
     
     # prepare class activation map analysis
     # -----
     
+    #test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
     cams, img, tar, out, topk_prob, topk_pred = generate_class_activation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
-    visualizer.show_cam_samples(cams, img, tar[:,0], topk_prob, topk_pred, n_samples=5)
-    visualizer.show_cam_means(cams, tar[:,0], topk_prob, topk_pred)
+    # visualizer.show_cam_samples(cams, img, tar[:,0], topk_prob, topk_pred, n_samples=5)
+    # visualizer.show_cam_means(cams, tar[:,0], topk_prob, topk_pred)
     
     # filter correct predictions - best topk at last timestep = target
     correct_indices = (tar[:,0] == topk_pred[:, -1, 0])
     # show means for correct predictions
-    visualizer.show_cam_means(
-        cams[correct_indices],
-        tar[correct_indices,0],
-        topk_prob[correct_indices],
-        topk_pred[correct_indices]
-        )    
+    # visualizer.show_cam_means(
+    #     cams[correct_indices],
+    #     tar[correct_indices,0],
+    #     topk_prob[correct_indices],
+    #     topk_pred[correct_indices]
+    #     )    
+    
+
+    
+    visualizer.plot_cam_means(cams, tar[:,0], topk_prob, topk_pred)
+    for i in range(5):
+        visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=list(np.random.choice(np.arange(1000),3)))
+    
+    
+    # use an alternative image preprocessing pipeline to shift the images to the top left and feed them to the visualization processor:
+    # torchvision.transforms.functional.affine(b,0,[-10,-10], 1.0,0)
+    
     
     import sys
     sys.exit()
-    
-    # TODO: Write this functions to plot CAMS for the paper
-    visualizer.plot_cam_samples()
-    visualzier.plot_cam_means()
 
 # training loop
 
