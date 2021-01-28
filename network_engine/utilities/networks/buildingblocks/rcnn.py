@@ -92,20 +92,9 @@ class CAM(nn.Module):
             fc_weight = nn.Parameter(self.network.fc.weight.t().unsqueeze(0))
             fc_weight = fc_weight.repeat(b, 1, 1)
             cam = torch.bmm(feature_map, fc_weight).transpose(1, 2)
-            ## normalize to 0 ~ 1
-            # this only makes sense when evaluation of one timestep? or at all?
-            # min_val, min_args = torch.min(cam, dim=2, keepdim=True)
-            # cam -= min_val
-            # max_val, max_args = torch.max(cam, dim=2, keepdim=True)
-            # cam /= max_val
             
             
-            # # normalize by standard deviation and mean of the distribution?
-            mean_val = torch.mean(cam, dim=1, keepdim=True)
-            cam -= mean_val
-            max_val, max_args = torch.max(cam, dim=2, keepdim=True)
-            cam /= max_val
-            
+
             ## top k class activation map
             cam = cam.view(b, -1, h, w)
             # top k sorting should be outsourced to the visualization?
@@ -114,8 +103,10 @@ class CAM(nn.Module):
             #     topk_cam.append(cam[i, topk_arg[i,:],:,:])
             # topk_cam = torch.stack(topk_cam, 0)
             
-            cam_upsampled = nn.functional.interpolate(cam, 
+            cam_upsampled = F.interpolate(cam, 
                                             (x.size(3), x.size(4)), mode='bilinear', align_corners=True)
+            
+            _,n_classes,fh,fw = cam_upsampled.shape
             cams.append(cam_upsampled)
             topk_prob_list.append(topk_prob)
             topk_arg_list.append(topk_arg)
