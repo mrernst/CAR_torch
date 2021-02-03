@@ -56,7 +56,6 @@ import pyarrow as pa
 
 import torch
 from torch.utils.data import Dataset, DataLoader
-from torchvision.transforms import transforms
 from torchvision.datasets import ImageFolder
 from torchvision import transforms, datasets
 
@@ -505,6 +504,16 @@ class RandomData(Dataset):
 
 		return image, label
 
+
+class AffineTransform:
+	"""Rotate by one of the given angles."""
+
+	def __init__(self, x_shift, y_shift):
+		self.x_shift = x_shift
+		self.y_shift = y_shift
+	
+	def __call__(self, x):
+		return transforms.functional.affine(x,0,[self.x_shift,self.y_shift], 1.0,0)
 
 
 
