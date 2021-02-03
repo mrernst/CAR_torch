@@ -532,6 +532,8 @@ def quantify_pixel_importance(cams, preds, percentage=0.25):
     # offset by minimum of each upsampled activation map
     min_val, min_args = torch.min(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
     cams -= torch.unsqueeze(min_val, dim=-1)
+    ## or take the absolute value?
+    #cams = torch.abs(cams)
     # normalize by the sum of each upsampled activation map
     sum_val = torch.sum(cams, dim=[-2,-1], keepdim=True)
     cams /= sum_val
@@ -547,16 +549,46 @@ def quantify_pixel_importance(cams, preds, percentage=0.25):
         pixels_per_timestep = torch.stack(pixels_per_timestep, 0)
         pixel_array.append(pixels_per_timestep)
     pixel_array = np.array(torch.stack(pixel_array, dim=1))
-    print(np.mean(pixel_array,0))
+    #print(np.mean(pixel_array,0))
     
     fig, ax = plt.subplots()
     for timestep in range(t):
         plot_distribution(pixel_array[:,timestep], ax, lab='$t={}$'.format(timestep))
     ax.legend()
-    ax.set_title('pixels accounting for {}% classification mass'.format(int(percentage*100)))
+    ax.set_title('pixels accounting for {}% class output mass'.format(int(percentage*100)))
     plt.show()
 
 
+    pass
+
+def plot_cam_fourier_space(predicted_cams,imnr=None):
+    b,t,h,w = predicted_cams.shape
+    
+    fig, ax = plt.subplots(nrows=6, ncols=4, figsize=(9, 11))
+    # fft of the heatmap
+    for timestep in range(t):
+        if imnr:
+            image = predicted_cams[imnr, timestep,:,:]
+        else:
+            image = torch.mean(predicted_cams, dim=0)[timestep,:,:]
+        freq = np.fft.fft2(image)
+        freq = np.abs(freq)
+        freq[0,0] = np.min(freq)
+    
+        ax[0,timestep].hist(freq.ravel(), bins=100)
+        ax[0,timestep].set_title('hist(freq)', fontsize=7)
+        ax[1,timestep].hist(np.log(freq).ravel(), bins=100)
+        ax[1,timestep].set_title('hist(log(freq))', fontsize=7)
+        ax[2,timestep].imshow(freq, interpolation="none")
+        ax[2,timestep].set_title('freq', fontsize=7)
+        ax[3,timestep].imshow(np.fft.fftshift(freq), interpolation="none")
+        ax[3,timestep].set_title('freq', fontsize=7)
+        ax[4,timestep].imshow(np.log(freq), interpolation="none")
+        ax[4,timestep].set_title('log(freq)', fontsize=7)
+        ax[5,timestep].imshow(image, interpolation="none")
+        ax[5,timestep].set_title('image', fontsize=7)
+    plt.show()
+    
     pass
 
 
@@ -920,9 +952,9 @@ def plot_cam_means(cams, targets, probs, preds):
             topk_cam.append(cams[batch, timestep, preds[batch, timestep, 0],:,:])
         topk_cam = torch.stack(topk_cam, 0)
         uber_cam.append(topk_cam)
-    #cams_current = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
     cams_current = torch.stack(uber_cam, dim=1)
-    
+    #plot_cam_fourier_space(cams_current, imnr=1)
+    #plot_cam_fourier_space(cams_current)
     
     # last prediction evolution (final)
     uber_cam = []
@@ -932,9 +964,7 @@ def plot_cam_means(cams, targets, probs, preds):
             topk_cam.append(cams[batch, timestep, preds[batch, -1, 0],:,:])
         topk_cam = torch.stack(topk_cam, 0)
         uber_cam.append(topk_cam)
-    #cams_final = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
     cams_final = torch.stack(uber_cam, dim=1)
-    
     
     # target evolution (target)
     uber_cam = []
@@ -944,7 +974,6 @@ def plot_cam_means(cams, targets, probs, preds):
             topk_cam.append(cams[batch, timestep, targets[batch],:,:])
         topk_cam = torch.stack(topk_cam, 0)
         uber_cam.append(topk_cam)
-    #cams_last = torch.mean(torch.stack(uber_cam, dim=1), dim=0)
     cams_target = torch.stack(uber_cam, dim=1)
     
     cams_by_row = [cams_current, cams_final, cams_target]
@@ -959,9 +988,6 @@ def plot_cam_means(cams, targets, probs, preds):
             list_of_fitted_data = []
             initial_guess = (3.,15,14,5,5,0.,10.) # handcrafted parameters
             for j in range(b):
-                #data = twoD_Gaussian((x, y), 3, 16, 16, 6 - ti*1.5, 4 - ti*1.5, np.pi/4, 10)
-                #data_noisy = (data + 0.5*np.random.normal(size=data.shape))
-                
                 # insert real data here
                 data_noisy = cams_by_row[row][j,ti,:,:].numpy()
                 x_init, y_init = np.where(data_noisy == np.amax(data_noisy))   
@@ -977,19 +1003,19 @@ def plot_cam_means(cams, targets, probs, preds):
                     popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess_2, maxfev=50000)
                 popt_list.append(popt)
                 initial_guess = popt
-                # decide whether the metic is supposed to be the maximum or the intermediate
+                # decide whether the metric is supposed to be the maximum or the intermediate
                 dict_of_metric[ti].append(np.sqrt(popt[3]**2 + popt[4]**2))
                 #dict_of_metric[ti].append(max(popt[3], popt[4]))
             for popt in popt_list:
                 list_of_fitted_data.append(twoD_Gaussian((x, y), *popt))
             popt_list = []
-    
-            ax[row,ti].imshow(np.mean(list_of_data,0).reshape(32, 32), cmap="rocket", origin='lower',
+
+            ax[row,ti].imshow(np.mean(list_of_data,0).reshape(32, 32), cmap="rocket", origin='upper',
                 extent=(x.min(), x.max(), y.min(), y.max()))
-            ax[row,ti].contour(x, y, np.mean(list_of_fitted_data,0).reshape(32, 32), [.35,.4,.45,.5], colors='gray',linewidths=.25, linestyles='dashed')
+            ax[row,ti].contour(x, np.flip(y), np.mean(list_of_fitted_data,0).reshape(32, 32), [.35,.4,.45,.5], colors='gray',linewidths=.25, linestyles='dashed')
             
             popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.mean(list_of_data,0), p0=(1.,15,14,1,1,0.,3.), maxfev=50000)
-            ax[row,ti].contour(x, y, (twoD_Gaussian((x, y), *popt)).reshape(32, 32), [.35,.4,.45,.5], colors='w',linewidths=.25)
+            ax[row,ti].contour(x, np.flip(y), (twoD_Gaussian((x, y), *popt)).reshape(32, 32), [.35,.4,.45,.5], colors='w',linewidths=.25)
 
             #ax[row,ti].axis('off')
             ax[row,ti].set_yticks([])
@@ -1070,6 +1096,7 @@ def plot_cam_means(cams, targets, probs, preds):
     ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,+12]), weight='bold', fontsize=24)
     
     plt.show()
+    
 
 
 # -----------------
@@ -1877,13 +1904,16 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     ax.set_xlabel('Time step', fontsize=12)
     ax.legend(ax.get_legend_handles_labels()[0],['$d_{rel,1}$', '$d_{rel,2}$'],frameon=True, facecolor='white', edgecolor='white', framealpha=1.0, loc='lower left')
     # plt.savefig('violinplot.pdf')
-    # TODO: add statistical annotation
     from statannot import add_stat_annotation
     add_stat_annotation(ax, data=reldist_df, x='timestep', y='data', hue='occluder',
         box_pairs=[
+            # ((0,1),(1,1)),
+            # ((1,1),(2,1)),
+            # ((0,2),(1,2)),
+            # ((1,2),(2,2)),
             ((2,1),(3,1)),
             ((2,2),(3,2)),
-        ], test='t-test_ind', text_format='star', loc='inside', verbose=2)
+        ], test='Kolmogorov-Smirnov', text_format='star', loc='inside', verbose=2)
     plt.tight_layout()
     plt.show()
     
