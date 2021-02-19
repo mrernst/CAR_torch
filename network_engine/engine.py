@@ -72,7 +72,7 @@ import utilities.helper as helper
 import utilities.visualizer as visualizer
 import utilities.distancemetrics as distancemetrics
 from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
-from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder
+from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder, AffineTransform
 
 def asMinutes(s):
     m = math.floor(s / 60)
@@ -508,6 +508,8 @@ else:
     test_transform = train_transform
 
 
+# input dataset
+
 if CONFIG['dataset'] == 'mnist':
     train_dataset = datasets.MNIST(root=CONFIG['input_dir'], train=True,
     transform=transforms.Compose([
@@ -523,7 +525,7 @@ if CONFIG['dataset'] == 'mnist':
         transforms.Normalize((0.,), (1.,))
     ,]),
     download=True)
-elif CONFIG['dataset'] == 'osycb2':
+elif 'ycb' in CONFIG['dataset']:
     print('[INFO] No LMDB-file available, using standard folder instead')
     if CONFIG['occlusion_percentage'] == 0:
         train_dataset = StereoImageFolder(
@@ -628,14 +630,12 @@ if FLAGS.testrun:
     SIZE = 1000
     np.random.seed(1234)
     
-    # # load pretrained network
-    # network, optimizer, start_epoch = load_checkpoint(network, optimizer, '/Users/markus/Research/Code/titan/trained_models/BLT3_osmnist2r_mono/')
-    # #network.eval()
-    # 
-    # test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, CONFIG['epochs'], CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
-    
     # load pretrained network
     network, optimizer, start_epoch = load_checkpoint(network, optimizer, '/Users/markus/Research/Code/titan/trained_models/BLT3_osmnist2r_stereo/')
+    
+    # look at test-error
+    # test_loss, test_accurary, cm, pr, vp = test_recurrent(test_loader, network, criterion, CONFIG['epochs'], CONFIG['time_depth'] + 1 + CONFIG['time_depth_beyond'], CONFIG['stereo'])
+
 
     # prepare softmax analysis
     # -----
@@ -671,32 +671,32 @@ if FLAGS.testrun:
     featu, imgu, taru, _ = generate_hidden_representation(test_loader_unoccluded, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
 
-
-    
-    # hand the date to the visualization functions
+    # hand the data to the visualization functions
     # -----
+    highlights=[[1629,226],[516,909]] #[[1672,812,1629,226],[516,909]]
     # visualizer.plot_tsne_evolution2(
     #     torch.cat([feat,featu], dim=0),
     #     torch.cat([img,imgu], dim=0),
     #     torch.cat([tar[:,0],taru], dim=0),
+    #     show_indices=False, N=highlights,
     #     overwrite=False)
-    # visualizer.plot_softmax_output(out, tar[:,0], img)    
-    # visualizer.plot_relative_distances(feat, tar, featu, taru)
     
-    
-    # prepare class activation map analysis
-    # -----
-    
+    #visualizer.plot_softmax_output(out, tar[:,0], img)
+    #visualizer.plot_relative_distances(feat, tar, featu, taru)
+#     
+#     
+#     # prepare class activation map analysis
+#     # -----
+#     
+    # use the full testset
     #test_loader = torch.utils.data.DataLoader(test_dataset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
-    cams, img, tar, out, topk_prob, topk_pred = generate_class_activation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
-    # visualizer.show_cam_samples(cams, img, tar[:,0], topk_prob, topk_pred, n_samples=5)
-    # visualizer.show_cam_means(cams, tar[:,0], topk_prob, topk_pred)
+    cams, img, tar, out, topk_prob, topk_pred = generate_class_activation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
     
     # filter correct predictions - best topk at last timestep = target
     correct_indices = (tar[:,0] == topk_pred[:, -1, 0])
     # show means for correct predictions
-    # visualizer.show_cam_means(
+    # visualizer.plot_cam_means(
     #     cams[correct_indices],
     #     tar[correct_indices,0],
     #     topk_prob[correct_indices],
@@ -704,15 +704,52 @@ if FLAGS.testrun:
     #     )    
     
 
-    
-    visualizer.plot_cam_means(cams, tar[:,0], topk_prob, topk_pred)
-    for i in range(5):
+#     
+    #visualizer.plot_cam_means(cams, tar[:,0], topk_prob, topk_pred)
+    for i in range(10):
         visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=list(np.random.choice(np.arange(1000),3)))
+    visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541])
     
+    # use the 'full' testset and alternative image preprocessing pipelines to shift the images to the different spots and feed them to the cam visualization processor:
+    # c3,t3,prob3,pred3 = [],[],[],[]
+    # for x_s,y_s in [(-8,8),(8,-8),(0,0)]:
+    #     cam_transform = transforms.Compose([
+    #         AffineTransform(x_shift=x_s, y_shift=y_s),
+    #         transforms.Grayscale(),
+    #         transforms.ToTensor(),
+    #         transforms.Normalize((0.,), (1.,))
+    #     ])
+    #     
+    #     test_dataset = StereoImageFolder(
+    #         root_dir=CONFIG['input_dir'] + '/{}'.format('osmnist2rf_center_reduced'),
+    #         train=False,
+    #         stereo=CONFIG['stereo'],
+    #         transform=cam_transform,
+    #         nhot_targets=True
+    #         )
+    c3,t3,prob3,pred3 = [],[],[],[]
+    for ds in ['osmnist2rf_br_reduced','osmnist2rf_tl_reduced','osmnist2rf_c_reduced']:
+        
+        test_dataset = StereoImageFolder(
+            root_dir=CONFIG['input_dir'] + '/{}'.format(ds),
+            train=False,
+            stereo=CONFIG['stereo'],
+            transform=test_transform,
+            nhot_targets=True
+            )
+        
+        # delete subset generation from final evaluation
+        test_subset = torch.utils.data.Subset(test_dataset, rep_sample)
+        
+        test_loader = torch.utils.data.DataLoader(test_subset, batch_size=CONFIG['batchsize'], shuffle=False, num_workers=4)
+        
+        cams, img, tar, out, topk_prob, topk_pred = generate_class_activation(test_loader, network, CONFIG['time_depth'] + 1, CONFIG['stereo'])
+        c3.append(cams)
+        t3.append(tar)
+        prob3.append(topk_prob)
+        pred3.append(topk_pred)
     
-    # use an alternative image preprocessing pipeline to shift the images to the top left and feed them to the visualization processor:
-    # torchvision.transforms.functional.affine(b,0,[-10,-10], 1.0,0)
-    
+    visualizer.plot_cam_means2(c3, t3, prob3, pred3)
     
     import sys
     sys.exit()
