@@ -525,7 +525,7 @@ if CONFIG['dataset'] == 'mnist':
         transforms.Normalize((0.,), (1.,))
     ,]),
     download=True)
-elif 'ycb' in CONFIG['dataset']:
+elif 'osycb' in CONFIG['dataset']:
     print('[INFO] No LMDB-file available, using standard folder instead')
     if CONFIG['occlusion_percentage'] == 0:
         train_dataset = StereoImageFolder(
