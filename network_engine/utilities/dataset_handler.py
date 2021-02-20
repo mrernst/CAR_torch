@@ -191,6 +191,7 @@ class StereoImageFolder(Dataset):
 	def _add_data(self, root_dir):
 		root_dir = root_dir + '/train/left/' if self.train else root_dir + '/test/left/'
 		objectclasses = os.listdir(root_dir)
+		new_left_samples = []
 		try:
 			objectclasses.remove('.DS_Store')
 		except(ValueError):
@@ -204,11 +205,12 @@ class StereoImageFolder(Dataset):
 			except(ValueError):
 				pass
 			for name in filenames:
+				new_left_samples.append(os.path.join(root_dir, cla, name))
 				self.paths_to_left_samples.append(
 					os.path.join(root_dir, cla, name))
 					
 		
-		for item in self.paths_to_left_samples:
+		for item in new_left_samples:
 			self.paths_to_right_samples.append(item.split('left')[0] + 'right' + item.split('left')[1])
 	
 	def _remove_data(self, n_samples, last_samples=True):
