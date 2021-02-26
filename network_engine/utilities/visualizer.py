@@ -295,7 +295,6 @@ class ImageAnnotations3D():
 
 
 
-
 class ConfusionMatrix(object):
         """
         Holds and updates a confusion matrix object given the networks
@@ -836,7 +835,6 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
     preds (b,t,topk)           Predictions of the Network
     alpha                      Transparency of the heatmap overlay
     """
-    
     # generate a rocket-like colormap with alpha values
     # -----
     # get colormap
@@ -871,8 +869,12 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
     # normalize by the sum of each upsampled activation map
     #sum_val = torch.sum(cams, dim=[-2,-1], keepdim=True)
     #cams /= sum_val
+    if n_rows > 3:
+        grid_dict = dict(left=0.05,right=0.875, bottom=0.04, top=0.973)
+    else:
+        grid_dict = dict(left=0.05,right=0.875)
 
-    fig, ax = plt.subplots(n_rows,t+1)
+    fig, ax = plt.subplots(n_rows,t+1, gridspec_kw=grid_dict, figsize=(6.4, 4.8/3.0*n_rows))
 
     for row,ind in enumerate(list_of_indices):
         for ti in range(t):
@@ -919,7 +921,7 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
             #ax[row,ti].contour(threshold_map, levels=[1.0], colors='red', linewidths=[0.5],
             #    extent=[0-0.5, x[:-1].max()-0.5,0-0.5, y[:-1].max()-0.5])
             
-            ax[row,ti].set_xlabel('{}|{} [{},{}]'.format(preds[ind,ti,0], n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2]))
+            ax[row,ti].set_xlabel('{}|{} [{},{}]'.format(preds[ind,ti,0], n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2]), fontsize=12)
             ax[row,ti].set_yticks([])
             ax[row,ti].set_xticks([])
             
@@ -927,7 +929,7 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
             cdat = cams[ind,ti,preds[ind,ti,0],:,:].numpy()
             x_init, y_init = np.where(cdat == np.amax(cdat))  
             initial_guess_2 = (np.amax(cdat),x_init[0],y_init[0],1,1,0.,3.)
-            popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.reshape(cams[ind,ti,preds[ind,ti,0],:,:],h*w), p0=initial_guess, maxfev=50000)
+            #popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.reshape(cams[ind,ti,preds[ind,ti,0],:,:],h*w), p0=initial_guess, maxfev=50000)
             #ax[row,ti].contour(x, y, (twoD_Gaussian((x, y), *popt)).reshape(32, 32), [.35,.4,.45,.5], colors='w',linewidths=.5)
         # divider = make_axes_locatable(ax[row,-2])
         # cax = divider.append_axes("right", size="5%", pad=0.05)
@@ -947,10 +949,14 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
         divider = make_axes_locatable(ax[row,-1])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = fig.colorbar(im, cax=cax, ticks=[min, (min+max)/2., max])
-        cax.tick_params(axis='both', which='major', labelsize=7)
+        cax.tick_params(axis='both', which='major', labelsize=10)
         # enlarge axis by 10%
         box = ax[row,-1].get_position()
-        ax[row,-1].set_position([box.x0 + 0.025, box.y0 - 0.014, box.width * 1.12, box.height * 1.12])
+        if n_rows > 3:
+            y_offset = 0.0045
+        else:
+            y_offset = 0.014
+        ax[row,-1].set_position([box.x0 + 0.025, box.y0 - y_offset , box.width * 1.12, box.height * 1.12]) #box.y0 - 0.014
         
         ax[row,-1].set_yticks([])
         ax[row,-1].set_xticks([])
@@ -959,28 +965,167 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
     
     for ti in range(t):
         ax[0,ti].annotate('$t_{}$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
-        fontsize=9, ha='center', va='bottom',
+        fontsize=12, ha='center', va='bottom',
         bbox=dict(boxstyle='square', fc='white', ec='white'),
         #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
         )
     ax[0,-1].annotate('$\Delta t$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
-    fontsize=9, ha='center', va='bottom',
+    fontsize=12, ha='center', va='bottom',
     bbox=dict(boxstyle='square', fc='white', ec='white'),
     #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
     )
     
     ax_in = ax[0,1]
 
-    ax[0,0].annotate('A', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,-12]), weight='bold', fontsize=24)
+    ax[0,0].annotate('A', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-10,-12]), weight='bold', fontsize=24)
     
-    ax[-1,0].text(22, 48, '3|3[8,5] = output:3 | target:3 [occluder1:8, occluder2:5]',
-    fontsize=10, horizontalalignment='left',
+    ax[-1,0].text(18, 48, '3|3 [8,5] = output:3 | target:3 [occluder1:8, occluder2:5]',
+    fontsize=12, horizontalalignment='left',
     verticalalignment='center')
 
 
-    #plt.subplots_adjust(left = 0.05)
+    plt.savefig('/Users/markus/Desktop/cam_samples.pdf')
     plt.show()
-     
+
+def plot_cam_samples_alt(cams, pics, targets, probs, preds, list_of_indices=[948,614,541], alpha=0.5):
+    """
+    cams (b,t,n_classes,h,w)   Class Activation Maps
+    pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
+    targets (b,n_occ)          NHot Target Vectors
+    probs (b,t,topk)           Probabilities for Each output
+    preds (b,t,topk)           Predictions of the Network
+    alpha                      Transparency of the heatmap overlay
+    """
+    # generate a rocket-like colormap with alpha values
+    # -----
+    # get colormap
+    from matplotlib.colors import LinearSegmentedColormap
+    ncolors = 256
+    color_array = plt.get_cmap('rocket')(range(ncolors))
+    # change alpha values
+    color_array[:,-1] = np.linspace(1.0,0.0,ncolors)
+    # create a colormap object
+    map_object = LinearSegmentedColormap.from_list(name='rocket_alpha',colors=color_array)
+    # register this new colormap with matplotlib
+    plt.register_cmap(cmap=map_object)
+    
+    
+    b,t,n_classes,h,w = cams.shape
+    n_rows = len(list_of_indices)
+    # Create x and y indices for gaussian2D data
+    x = np.linspace(0, 31, 32)
+    y = np.linspace(0, 31, 32)
+    x, y = np.meshgrid(x, y)
+    n_hot_targets = targets if len(targets.shape) > 1 else torch.stack([targets,targets,targets],-1)
+    targets = targets[:,0] if len(targets.shape) > 1 else targets
+    print("[INFO] showing CAMS for indices {}".format(list_of_indices))
+    # normalize cams to 0,1
+    # -----
+    # offset by minimum of each upsampled activation map
+    min_val, min_args = torch.min(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams -= torch.unsqueeze(min_val, dim=-1)
+    # divide by the maximum of each activation map
+    max_val, max_args = torch.max(cams.view(b,t,n_classes,h*w), dim=-1, keepdim=True)
+    cams /= torch.unsqueeze(max_val, dim=-1)
+    # normalize by the sum of each upsampled activation map
+    #sum_val = torch.sum(cams, dim=[-2,-1], keepdim=True)
+    #cams /= sum_val
+    if n_rows > 3:
+        grid_dict = dict(left=0.05,right=0.875, bottom=0.04, top=0.973)
+    else:
+        grid_dict = dict(left=0.05,right=0.875, bottom=0.12)
+
+    fig, ax = plt.subplots(n_rows,t, gridspec_kw=grid_dict, figsize=(6.4 - 0.5, 5.2/3.0*n_rows))
+    
+    for row,ind in enumerate(list_of_indices):
+        current_image = pics[ind,0,0,:,:]
+        ax[row,0].imshow(current_image, cmap="Greys", interpolation="none")
+        ax[row,0].set_xlabel('{} [{},{}]'.format(n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2]), fontsize=12)
+        ax[row,0].set_xlabel
+        ax[0,0].annotate('stimulus', xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+        fontsize=12, ha='center', va='bottom',
+        bbox=dict(boxstyle='square', fc='white', ec='white'),
+        )
+        
+        ti = 0
+        min, max = (cams[ind,ti,preds[ind,ti,0],:,:]).min(), (cams[ind,ti,preds[ind,ti,0],:,:]).max()
+        im = ax[row,1].imshow(cams[ind,ti,preds[ind,ti,0],:,:], cmap="rocket",    alpha=1.0, interpolation='nearest', vmin=min, vmax=max)
+        ax[0,1].annotate('$t_{}$'.format(0), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+        fontsize=12, ha='center', va='bottom',
+        bbox=dict(boxstyle='square', fc='white', ec='white'),
+        #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
+        )
+        ax[row,1].set_xlabel('prediction: {}'.format(preds[ind,ti,0]), fontsize=12)
+        
+        ti = 3
+        min, max = (cams[ind,ti,preds[ind,ti,0],:,:]).min(), (cams[ind,ti,preds[ind,ti,0],:,:]).max()
+        im = ax[row,2].imshow(cams[ind,ti,preds[ind,ti,0],:,:], cmap="rocket",    alpha=1.0, interpolation='nearest', vmin=min, vmax=max)
+        ax[0,2].annotate('$t_{}$'.format(3), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+        fontsize=12, ha='center', va='bottom',
+        bbox=dict(boxstyle='square', fc='white', ec='white'),
+        #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
+        )
+        ax[row,2].set_xlabel('prediction: {}'.format(preds[ind,ti,0]), fontsize=12)
+        for ti in range(t):
+            ax[row,ti].set_yticks([])
+            ax[row,ti].set_xticks([])
+        # color bar
+        min, max = 0.0, 1.0
+        divider = make_axes_locatable(ax[row,2])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = fig.colorbar(im, cax=cax, ticks=[min, max])
+        cax.tick_params(axis='both', which='major', labelsize=10)
+        # enlarge axis by 10%
+        box = ax[row,2].get_position()
+        if n_rows > 3:
+            y_offset = 0.0040
+        else:
+            y_offset = 0.0055
+        ax[row,2].set_position([box.x0, box.y0 - y_offset, box.width * 1.07, box.height * 1.07]) #box.y0 - 0.014
+        
+        
+        # Delta T Plot
+        ax[row, -1].imshow(pics[ind,-1,0,:,:], cmap="Greys")
+        min, max = (cams[ind,-1,preds[ind,-1,0],:,:] - cams[ind,0,preds[ind,0,0],:,:]).min(), (cams[ind,-1,preds[ind,-1,0],:,:] - cams[ind,0,preds[ind,0,0],:,:]).max()
+        min, max = -0.5, +0.5
+        # zero_pos = (-min) / (-min + max)
+        # zero_centered_cmap = make_cmap([(0,0,255),(255,255,255),(255,0,0)], position=[0, zero_pos, 1], bit=True)
+        im = ax[row, -1].imshow(cams[ind,-1,preds[ind,-1,0],:,:] - cams[ind,0,preds[ind,0,0],:,:], cmap="icefire", alpha=alpha if alpha > 0.75 else 0.75, interpolation='nearest', vmin=-max, vmax=max)
+        divider = make_axes_locatable(ax[row,-1])
+        cax = divider.append_axes("right", size="5%", pad=0.05)
+        cbar = fig.colorbar(im, cax=cax, ticks=[min, (min+max)/2., max])
+        cax.tick_params(axis='both', which='major', labelsize=10)
+        # enlarge axis by 10%
+        box = ax[row,-1].get_position()
+        if n_rows > 3:
+            y_offset = 0.0040
+        else:
+            y_offset = 0.0055
+        ax[row,-1].set_position([box.x0 + 0.025, box.y0 - y_offset , box.width * 1.07, box.height * 1.07]) #box.y0 - 0.014
+        
+        ax[row,-1].set_yticks([])
+        ax[row,-1].set_xticks([])
+        
+    
+    ax[0,-1].annotate('$\Delta t$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
+    fontsize=12, ha='center', va='bottom',
+    bbox=dict(boxstyle='square', fc='white', ec='white'),
+    #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
+    )
+    
+    ax_in = ax[0,1]
+
+    ax[0,0].annotate('A', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-8,-10]), weight='bold', fontsize=24)
+    
+    ax[-1,0].text(20, 44, '3 [8,5] = target:3 [occluder1:8, occluder2:5]',
+    fontsize=12, horizontalalignment='left',
+    verticalalignment='center')
+
+
+    plt.savefig('/Users/markus/Desktop/cam_samples.pdf')
+    plt.show()
+
+
 
 def plot_cam_means(cams, targets, probs, preds):
     b,t,n_classes,h,w = cams.shape
@@ -1282,7 +1427,7 @@ def plot_cam_means2(cams_list, targets, probs, preds):
 
             
             ax[0,ti].annotate('$t_{}$'.format(ti), xy=(0.5, 1.10), xytext=(0.5, 1.10), xycoords='axes fraction', 
-                        fontsize=9, ha='center', va='bottom',
+                        fontsize=12, ha='center', va='bottom',
                         bbox=dict(boxstyle='square', fc='white', ec='white'),
                         #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
                     )    
@@ -1291,13 +1436,13 @@ def plot_cam_means2(cams_list, targets, probs, preds):
         
         
             # plot marker where target is supposed to be
-            ax[0,0].set_ylabel('bottom-left')
+            ax[0,0].set_ylabel('bottom-left', fontsize=12)
             ax[0,ti].plot(16-row_y_shift[0], 16-row_y_shift[0], marker="+", color='black', markersize=5.0, markeredgewidth=.25)
 
-            ax[1,0].set_ylabel('top-right')
+            ax[1,0].set_ylabel('top-right', fontsize=12)
             ax[1,ti].plot(16+row_y_shift[0], 16+row_y_shift[0], marker="+", color='black', markersize=5.0, markeredgewidth=.25)
 
-            ax[2,0].set_ylabel('center')
+            ax[2,0].set_ylabel('center', fontsize=12)
             ax[2,ti].plot(16, 16, marker="+", color='black', markersize=5.0, markeredgewidth=.25)
 
         
@@ -1331,7 +1476,7 @@ def plot_cam_means2(cams_list, targets, probs, preds):
         divider = make_axes_locatable(ax[row,-2])
         cax = divider.append_axes("right", size="5%", pad=0.05)
         cbar = fig.colorbar(im, cax=cax, ticks=[min, (min+max)/2., max])
-        cax.tick_params(axis='both', which='major', labelsize=7)
+        cax.tick_params(axis='both', which='major', labelsize=10)
         cax.yaxis.set_major_formatter(FormatStrFormatter('%.2f'))
         # enlarge axis by 10%
         box = ax[row,-2].get_position()
@@ -1340,17 +1485,17 @@ def plot_cam_means2(cams_list, targets, probs, preds):
         
         # Shrink current axis by 50%
         box = ax[row,-1].get_position()
-        ax[row,-1].set_position([box.x0 + 0.075, box.y0 + 0.02, box.width * 0.5, box.height * 0.5])
+        ax[row,-1].set_position([box.x0 + 0.1, box.y0 + 0.02, box.width * 0.5, box.height * 0.5])
 
     
         #ax = plt.axes([0.75, 0.5, .10, .10])
         ax[row,-1].set_zorder(-1)
         ax[row,-1].matshow(significance_table, cmap='Greys')
 
-        ax[row,-1].set_xticklabels(['','$t_0$','$t_1$','$t_2$'], fontsize=7)#fontsize=65)
+        ax[row,-1].set_xticklabels(['','$t_0$','$t_1$','$t_2$'], fontsize=10)#fontsize=65)
         ax[row,-1].tick_params(labelbottom=True, labeltop=False,
                       right=False, top=False)
-        ax[row,-1].set_yticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=7)#fontsize=65)
+        ax[row,-1].set_yticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=10)#fontsize=65)
         ax[row,-1].set_xlim([-0.5, t - 1 - 0.5])
         ax[row,-1].set_ylim([t - 0.5, -0.5 + 1])
         ax[row,-1].spines['top'].set_visible(False)
@@ -2046,6 +2191,18 @@ def plot_tsne_evolution2(representations, imgs, targets, show_stimuli=True, show
                         xy_box = xy_box - np.array([20,13])
                     else:
                         pass
+                    # handcrafted annotation
+                    if i in [516] and ti == 0:
+                        ax.annotate('{}'.format('3 [2,0]'), xy=(x0, y0), xytext=xy_box + np.array([-5,25]), zorder=-1)
+                    elif i in [1629] and ti == 0:
+                        ax.annotate('{}'.format('2'), xy=(x0, y0), xytext=xy_box + np.array([-20,18]), zorder=-1)
+                    elif i in [909] and ti == 0:
+                        ax.annotate('{}'.format('3 [2,8]'), xy=(x0, y0), xytext=xy_box + np.array([-10,-23]), zorder=-1)
+                    elif i in [226] and ti == 0:
+                        ax.annotate('{}'.format('2 [9,8]'), xy=(x0, y0), xytext=xy_box + np.array([0,-27]), zorder=-1)
+                    else:
+                        pass
+                    
                     
                     ab = offsetbox.AnnotationBbox(makeMarker(imgs[i,ti,0], zoom=0.65*32./len(imgs[i,ti,0])), (x0, y0), xybox=xy_box, xycoords='data', boxcoords="offset points",
                                       pad=0.1,bboxprops=dict(color=colorset[pltnr][int(targets[i])]) , arrowprops=dict(arrowstyle=patches.ArrowStyle("->", head_length=.2, head_width=.1)), frameon=True)
@@ -2098,6 +2255,7 @@ def plot_tsne_evolution2(representations, imgs, targets, show_stimuli=True, show
         ax.text(-0.1, 1.05, string.ascii_uppercase[n], weight='bold', transform=ax.transAxes, size=18)
     
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.3)
+    plt.savefig('/Users/markus/Desktop/tsne.pdf', dpi=300, format='pdf')
     plt.show()
     pass
 
@@ -2145,14 +2303,14 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
                 representations[i,ti], centroid_unocc[c,ti])
     
     # calculate relative distances relative_distance = d_zur_8 / 0.5(d_zur_8 + d_zur_2)
-    for ti in range(time):
-        relative_distances[:,ti,0] = distances[:,ti,0] / (0.5*(distances[:,ti,0] + distances[:,ti,1]))
-        relative_distances[:,ti,1] = distances[:,ti,0] / (0.5*(distances[:,ti,0] + distances[:,ti,2]))
+    # for ti in range(time):
+    #     relative_distances[:,ti,0] = distances[:,ti,0] / (0.5*(distances[:,ti,0] + distances[:,ti,1]))
+    #     relative_distances[:,ti,1] = distances[:,ti,0] / (0.5*(distances[:,ti,0] + distances[:,ti,2]))
     
     # alternative relative distances
-    # for ti in range(time):
-    #     relative_distances[:,ti,0] = distances[:,ti,0] / distances[:,ti,1]
-    #     relative_distances[:,ti,1] = distances[:,ti,0] / distances[:,ti,2]
+    for ti in range(time):
+        relative_distances[:,ti,0] = distances[:,ti,0] / distances[:,ti,1]
+        relative_distances[:,ti,1] = distances[:,ti,0] / distances[:,ti,2]
     
     # create distribution plots
     # -----
@@ -2196,7 +2354,8 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     plt.show()
     
     
-    fig, ax = plt.subplots()
+    fig, ax = plt.subplots(figsize=(4.5, 3.4),
+                           gridspec_kw=dict(bottom=0.15, left=0.15))
     reldist_df = pd.DataFrame(
     np.hstack([
     np.vstack([relative_distances[:,0,0], np.repeat(0, points), np.repeat(1, points)]),
@@ -2215,9 +2374,9 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     #ax.axhline(y=0), xmin=0, xmax=5, color='black', linestyle='--')
     #ax.set_title('Relative distance - unoccluded target, unoccluded occluder')
     ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=12)
-    ax.set_ylabel('Relative distance', fontsize=12)
-    ax.set_xlabel('Time step', fontsize=12)
-    ax.legend(ax.get_legend_handles_labels()[0],['$d_{rel,1}$', '$d_{rel,2}$'],frameon=True, facecolor='white', edgecolor='white', framealpha=1.0, loc='lower left')
+    ax.set_ylabel('Relative distance')
+    ax.set_xlabel('Time step')
+    ax.legend(ax.get_legend_handles_labels()[0],['$d_{rel,1}$', '$d_{rel,2}$'],frameon=True, facecolor='white', edgecolor='white', framealpha=0.0, loc='upper right')
     # from statannot import add_stat_annotation
     # add_stat_annotation(ax, data=reldist_df, x='timestep', y='data', hue='occluder',
     #     box_pairs=[
@@ -2228,7 +2387,7 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     #         ((2,1),(3,1)),
     #         ((2,2),(3,2)),
     #     ], test='Kolmogorov-Smirnov-ls', text_format='star', loc='inside', verbose=2)
-    ax.annotate('B', xy=(ax.get_xlim()[0],ax.get_ylim()[1]), xytext=np.array([ax.get_xlim()[0],ax.get_ylim()[1]])+np.array([-0.5,0.1]), weight='bold', fontsize=24)
+    ax.annotate('B', xy=(ax.get_xlim()[0],ax.get_ylim()[1]), xytext=np.array([ax.get_xlim()[0],ax.get_ylim()[1]])+np.array([-0.75,0.25]), weight='bold', fontsize=16)
     
     plt.show()
     
@@ -2339,7 +2498,13 @@ def plot_softmax_output(network_output, targets, images):
     markerlist = ['o', 'v', 's', 'D']
     fillstylelist = ['full', 'full', 'full', 'full']
     
-    fig, axes = plt.subplots(2, 5, sharex=True, sharey=True, figsize=(14, 5))
+    fig, axes = plt.subplots(2, 5, sharex=True, sharey=True, figsize=(9, 3.5),
+                             gridspec_kw=dict(bottom=0.15,))
+                                 # wspace=0.0, hspace=0.3,
+                                 # top=0.90,
+                                 # bottom=0.075,
+                                 # left=0.05,
+                                 # right=0.95),))
     for j, ax in enumerate(axes.flatten()):
         for ti in range(time):
             ax.plot(mean_output[j, ti, :], label='$t_{}$'.format(ti), marker=markerlist[ti], markersize=3)
@@ -2352,9 +2517,21 @@ def plot_softmax_output(network_output, targets, images):
         ax.axvline(x=int(j),
                    ymin=0, ymax=2, color='black', linestyle='--')
         # ax.add_artist(ab)
+        
+        # add titles with targets
+        if j > 4:
+            t_x, t_y = 0.025, 0.
+        else:
+            t_x, t_y = 0.875, 0.
+        ax.text( 
+        # position text relative to Figure
+        t_x, t_y, '{}'.format(j),
+        ha='left', va='bottom',
+        transform=ax.transAxes, fontsize=14, color=sns.color_palette("colorblind", 10)[j])
+        #ax.add_patch(patches.Circle((1,1),1), ha='left', va='top', transform=ax.transAxes)
 
     axes[0, 4].legend(frameon=True, facecolor='white', edgecolor='white',
-                      framealpha=1.0, bbox_to_anchor=(1.0, .8), loc='center left')
+                      framealpha=1.0, bbox_to_anchor=(1.0, .72), loc='center left', title='time step')
     axes[0, 0].set_ylabel('Softmax output')
     axes[1, 0].set_ylabel('Softmax output')
     for i in range(5):
@@ -2365,8 +2542,9 @@ def plot_softmax_output(network_output, targets, images):
     plt.xticks(np.arange(0, classes, step=classes//10))
     #plt.suptitle('Mean softmax output over candidates for each target')
     #plt.savefig('mean_softmax.pdf')
-    axes[0,0].annotate('B', xy=(axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]), xytext=np.array([axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]])+np.array([-7,+2]), weight='bold', fontsize=24)
-    plt.show()
+    axes[0,0].annotate('B', xy=(axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]), xytext=np.array([axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]])+np.array([-9,+2]), weight='bold', fontsize=16)
+    plt.savefig('/Users/markus/Desktop/softmaxB.pdf', dpi=300, format='pdf')
+    #plt.show()
     
     
 #     fig, axes = plt.subplots(4, 5, sharex=True, sharey=True, figsize=(14, 10))
@@ -2465,7 +2643,7 @@ def plot_softmax_output(network_output, targets, images):
     candlist = [55, 49, 330, 313, 342]
     #candlist = [342, 340, 339, 330, 313, 285, 264,]
 
-    fig, axes = plt.subplots(1, 5, sharex=False, sharey='row', figsize=(14, 3))
+    fig, axes = plt.subplots(1, 5, sharex=False, sharey='row', figsize=(9, 2))
 
     for j, ax in zip(candlist, axes):
         for ti in range(time):
@@ -2474,13 +2652,21 @@ def plot_softmax_output(network_output, targets, images):
 
         ax.set_yscale('log')
         ax.set_ylim([1e-10, 5])
-        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=1.0), (.85, .15), xycoords='axes fraction', boxcoords="offset points",
+        ab = offsetbox.AnnotationBbox(makeMarker(images[j,0,0], zoom=0.60), (.85, .15), xycoords='axes fraction', boxcoords="offset points",
                                       pad=0.3, frameon=True)
         ax.axvline(x=targets[j], ymin=0,
                    ymax=2, color='black', linestyle='--')
         ax.add_artist(ab)
         ax.set_xticks(np.arange(0, classes, step=classes//10))
         ax.set_xlabel('Class')
+        
+        # add titles with targets
+        t_x, t_y = 0.025, 0.
+        ax.text( 
+        # position text relative to Figure
+        t_x, t_y, '{}'.format(targets[j]),
+        ha='left', va='bottom',
+        transform=ax.transAxes, fontsize=14, color=sns.color_palette("colorblind", 10)[targets[j]])
 
 
     axes[4].legend(frameon=True, facecolor='white', edgecolor='white', framealpha=1.0,
@@ -2488,12 +2674,12 @@ def plot_softmax_output(network_output, targets, images):
     axes[0].set_ylabel('Softmax output')
 
 
-    axes[0].annotate('A', xy=(axes[0].get_xlim()[0],axes[0].get_ylim()[1]), xytext=np.array([axes[0].get_xlim()[0],axes[0].get_ylim()[1]])+np.array([-7,+2]), weight='bold', fontsize=24)
+    axes[0].annotate('A', xy=(axes[0].get_xlim()[0],axes[0].get_ylim()[1]), xytext=np.array([axes[0].get_xlim()[0],axes[0].get_ylim()[1]])+np.array([-9,+2]), weight='bold', fontsize=16)
 
     plt.subplots_adjust(left=None, bottom=0.25, right=None,
                         top=0.85, wspace=None, hspace=None)
-
-    plt.show()
+    plt.savefig('/Users/markus/Desktop/softmaxA.pdf', dpi=300, format='pdf')
+    #plt.show()
     pass
 
 # ---------------------
