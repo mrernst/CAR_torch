@@ -627,7 +627,7 @@ else:
 # -----------------
 
 if FLAGS.testrun:
-    SIZE = 1000
+    SIZE = 10000
     np.random.seed(1234)
     
     # load pretrained network
@@ -682,7 +682,7 @@ if FLAGS.testrun:
     #     overwrite=False)
     # 
     #visualizer.plot_softmax_output(out, tar[:,0], img)
-    #visualizer.plot_relative_distances(feat, tar, featu, taru)
+    visualizer.plot_relative_distances(feat, tar, featu, taru)
 #     
 #     
 #     # prepare class activation map analysis
@@ -704,18 +704,16 @@ if FLAGS.testrun:
     #     )    
     
 
-#     
-    #visualizer.plot_cam_means(cams, tar[:,0], topk_prob, topk_pred)
+    # visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541])
+    # visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541])
+    # np.random.choice(np.arange(1000),10)
+    # visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741, 309, 289])
+    # visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741])
+    # 
     # for i in range(10):
-    #     visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=list(np.random.choice(np.arange(1000),3)))
-    visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541])
-    visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541])
-    #np.random.choice(np.arange(1000),10)
-    np.random.choice(np.arange(1000),10)
-    visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741, 309, 289])
-    visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741, 309, 289])
-
-    visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=list(np.random.choice(np.arange(1000),10)))
+    #     visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=list(np.random.choice(np.arange(1000),8)))
+    
+    
     # use the 'full' testset and alternative image preprocessing pipelines to shift the images to the different spots and feed them to the cam visualization processor:
     # c3,t3,prob3,pred3 = [],[],[],[]
     # for x_s,y_s in [(-8,8),(8,-8),(0,0)]:
