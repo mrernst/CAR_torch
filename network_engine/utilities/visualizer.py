@@ -1115,7 +1115,7 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, list_of_indices=[948
     
     ax_in = ax[0,1]
 
-    ax[0,0].annotate('A', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-8,-10]), weight='bold', fontsize=24)
+    ax[0,0].annotate('A', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-8,-8]), weight='bold', fontsize=24)
     
     ax[-1,0].text(20, 44, '3 [8,5] = target:3 [occluder1:8, occluder2:5]',
     fontsize=12, horizontalalignment='left',
@@ -1525,6 +1525,7 @@ def plot_cam_means2(cams_list, targets, probs, preds):
     # Annotate
     ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,+12]), weight='bold', fontsize=24)
     
+    plt.savefig('/Users/markus/Desktop/cammeans.pdf', dpi=300, format='pdf')
     plt.show()
 
 # -----------------
