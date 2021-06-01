@@ -282,6 +282,10 @@ def infer_additional_parameters(configuration_dict):
         configuration_dict['kernel_size'] = (5,5)
         configuration_dict['n_features'] = 32
         configuration_dict['network_depth'] = 2
+    elif 'Kx' in configuration_dict['connectivity']:
+        configuration_dict['kernel_size'] = (6,6)
+        configuration_dict['n_features'] = 32
+        configuration_dict['network_depth'] = 2
     elif 'D' in configuration_dict['connectivity']:
         configuration_dict['kernel_size'] = (3,3)
         configuration_dict['n_features'] = 32
