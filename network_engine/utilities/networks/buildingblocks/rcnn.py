@@ -340,8 +340,57 @@ class RecConv(nn.Module):
             hidden_state[self.num_layers - 1] = (layer_output_list[self.num_layers - 1], hidden_state[self.num_layers - 1][-1])
 
             output_inner.append(cur_layer_input)
-
+            # # look at activations
+            # activations_inner.append(layer_output_list)
         return torch.stack(output_inner, dim=1)
+    
+    def return_activations(self, input_tensor, hidden_state=None):
+
+        if not self.batch_first:
+            # (t, b, c, h, w) -> (b, t, c, h, w)
+            input_tensor = input_tensor.permute(1, 0, 2, 3, 4)
+
+        b, _, _, h, w = input_tensor.size()
+
+        # TODO: Implement stateful RCNN
+        if hidden_state is not None:
+            raise NotImplementedError()
+        else:
+            # Since the init is done in forward. Can send image size here
+            hidden_state = self._init_hidden(batch_size=b,
+                                             image_size=(h, w),
+                                             pooling=self.pooling)
+        
+        seq_len = input_tensor.size(1)
+        output_inner = []
+        activations_inner = []
+        for t in range(seq_len):
+            layer_output_list = []
+            cur_layer_input = input_tensor[:, t, :, :, :]
+            for layer_idx in range(self.num_layers):
+                l, td = hidden_state[layer_idx]
+                
+                cur_layer_input = self.cell_list[layer_idx](
+                    b_input=cur_layer_input,
+                    l_input=l,
+                    t_input=td)
+                    
+                layer_output_list.append(cur_layer_input)
+
+                if self.pooling and (layer_idx < (self.num_layers - 1)):
+                    cur_layer_input = self.maxpool(cur_layer_input)
+
+
+
+            # update hidden states
+            for layer_idx in range(self.num_layers - 1):
+                hidden_state[layer_idx] = (layer_output_list[layer_idx], layer_output_list[layer_idx+1])
+            hidden_state[self.num_layers - 1] = (layer_output_list[self.num_layers - 1], hidden_state[self.num_layers - 1][-1])
+
+            output_inner.append(cur_layer_input)
+            activations_inner.append(layer_output_list)
+
+        return activations_inner
 
     def _init_hidden(self, batch_size, image_size, pooling):
         init_states = []
