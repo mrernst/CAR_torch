@@ -100,7 +100,7 @@ if __name__ == "__main__":
 		print('*****')
 		
 		# mono data
-		trainset_data, testset_data = trainset_data[:,0,:,:], testset_data[:,0,:,:]
+		trainset_data, testset_data = trainset_data[:,0:1,:,:], testset_data[:,0:1,:,:]
 		print('training set shape:', trainset_data.shape)
 		
 		logit = linear_model.LogisticRegression(max_iter=10000)		
