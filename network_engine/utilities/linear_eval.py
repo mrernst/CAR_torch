@@ -27,7 +27,7 @@ if __name__ == "__main__":
 				)
 			
 			train_loader = DataLoader(
-			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
+			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=4)
 			
 			test_set = StereoImageFolder(
 			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
@@ -42,28 +42,31 @@ if __name__ == "__main__":
 			)
 			
 			
-			test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
+			test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4)
 			
 			# accumulate the dataset into memory
 			trainset_data = []
 			testset_data = []
 			trainset_targets = []
 			testset_targets = []
+			i = 0
 			for data in train_loader:
 				if train_set.stereo:
 					trainset_data.append(torch.cat([data[0][0], data[0][1]], axis=1))
 				else:
 					trainset_data.append(data[0])
 				trainset_targets.append(data[1])
-				#print('trainset iteration', len(trainset_data))
-			
+				i += 1
+				print('trainset iteration', i)
+			i = 0
 			for data in test_loader:
 				if test_set.stereo:
 					testset_data.append(torch.cat([data[0][0], data[0][1]], axis=1))
 				else:
 					testset_data.append(data[0])
 				testset_targets.append(data[1])
-				#print('testset iteration', len(testset_data))
+				i += 1
+				print('testset iteration', i)
 
 			
 			trainset_data = torch.cat(trainset_data,0)
