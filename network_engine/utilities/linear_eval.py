@@ -10,7 +10,7 @@ from dataset_handler import StereoImageFolder
 
 if __name__ == "__main__":
 	
-	batch_size = 500
+	batch_size = 100
 	dataset_list = ['osmnist2c','osmnist2r','osfmnist2c','osfmnist2r','osycb']
 	for ds in dataset_list:
 		for stereo_boolean in [False, True]:
@@ -27,7 +27,7 @@ if __name__ == "__main__":
 				)
 			
 			train_loader = DataLoader(
-			dataset=train_set, batch_size=batch_size, shuffle=True)
+			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
 			
 			test_set = StereoImageFolder(
 			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
@@ -42,7 +42,7 @@ if __name__ == "__main__":
 			)
 			
 			
-			test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4)
+			test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
 			
 			# accumulate the dataset into memory
 			trainset_data = []
@@ -55,6 +55,7 @@ if __name__ == "__main__":
 				else:
 					trainset_data.append(data[0])
 				trainset_targets.append(data[1])
+				print('trainset iteration', len(trainset_data))
 			
 			for data in test_loader:
 				if test_set.stereo:
@@ -62,6 +63,8 @@ if __name__ == "__main__":
 				else:
 					testset_data.append(data[0])
 				testset_targets.append(data[1])
+				print('testset iteration', len(testset_data))
+
 			
 			trainset_data = torch.cat(trainset_data,0)
 			testset_data = torch.cat(testset_data,0)
