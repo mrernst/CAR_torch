@@ -57,7 +57,9 @@ if __name__ == "__main__":
 					trainset_data.append(data[0])
 				trainset_targets.append(data[1])
 				i += 1
-				print('trainset iteration', i)
+				print(80*' ', end='\r')
+				print('trainset sample', i*batch_size, end='\r')
+
 			i = 0
 			for data in test_loader:
 				if test_set.stereo:
@@ -66,7 +68,9 @@ if __name__ == "__main__":
 					testset_data.append(data[0])
 				testset_targets.append(data[1])
 				i += 1
-				print('testset iteration', i)
+				print(80*' ', end='\r')
+				print('testset sample', i*batch_size, end='\r')
+
 
 			
 			trainset_data = torch.cat(trainset_data,0)
