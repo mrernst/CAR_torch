@@ -9,20 +9,27 @@ from sklearn import preprocessing, decomposition, naive_bayes, linear_model, met
 from dataset_handler import StereoImageFolder
 
 if __name__ == "__main__":
-	
+	#Grayscale needs to drop when osycb is loaded
+
 	batch_size = 100
 	dataset_list = ['osmnist2c','osmnist2r','osfmnist2c','osfmnist2r','osycb']
 	for ds in dataset_list:
+		if 'osycb' in ds:
+			tfs = transforms.Compose([
+				transforms.ToTensor(),
+			])
+		else:
+			tfs = transforms.Compose([
+				transforms.Grayscale(),
+				transforms.ToTensor(),
+			])
 		train_set = StereoImageFolder(
 			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
 			#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
 			root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
 			train=True,
 			stereo=True,
-			transform=transforms.Compose([
-				transforms.Grayscale(),
-				transforms.ToTensor(),
-			])
+			transform=tfs
 			)
 		
 		train_loader = DataLoader(
@@ -34,11 +41,9 @@ if __name__ == "__main__":
 			root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
 			train=False,
 			stereo=True,
-			transform=transforms.Compose([
-			transforms.Grayscale(),
-			transforms.ToTensor(),
-		])
+			transform=tfs
 		)
+		
 		
 		
 		test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4)
