@@ -51,8 +51,8 @@ if __name__ == "__main__":
 			print(80*' ', end='\r')
 			print('trainset sample', n*batch_size, end='\r')
 		
-		trainset_data = torch.cat(trainset_data,0)
-		trainset_targets = torch.cat(trainset_targets,0)
+		trainset_data = torch.cat(trainset_data,0).numpy()
+		trainset_targets = torch.cat(trainset_targets,0).numpy()
 
 
 		no_of_training_samples = trainset_data.shape[0]
@@ -117,8 +117,8 @@ if __name__ == "__main__":
 			print(80*' ', end='\r')
 			print('testset sample', n*batch_size, end='\r')
 
-		testset_data = torch.cat(testset_data,0)
-		testset_targets = torch.cat(testset_targets,0)
+		testset_data = torch.cat(testset_data,0).numpy()
+		testset_targets = torch.cat(testset_targets,0).numpy()
 		
 
 		
