@@ -28,6 +28,7 @@ if __name__ == "__main__":
 			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
 			#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
 			root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
+			root_dir='/Users/markus/moutpoint/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
 			train=True,
 			stereo=stereoboolean,
 			transform=tfs
@@ -98,6 +99,7 @@ if __name__ == "__main__":
 			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
 			#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
 			root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
+			root_dir='/Users/markus/moutpoint/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
 			train=False,
 			stereo=stereoboolean,
 			transform=tfs
