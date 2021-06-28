@@ -60,7 +60,7 @@ if __name__ == "__main__":
 			)
 	
 		train_loader = DataLoader(
-		dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=4)
+		dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
 		
 		
 		test_set = StereoImageFolder(
@@ -73,14 +73,14 @@ if __name__ == "__main__":
 		)
 		
 		
-		test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=4)
+		test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
 		
 		
 		logit_sgd = linear_model.SGDClassifier(max_iter=10000)
 		final_acc = 0
 		for e in progressbar.progressbar(range(epochs)):
-			#for n, data in progressbar.progressbar(enumerate(train_loader), max_value=len(train_set)//batch_size-1):
-			for n, data in enumerate(train_loader):
+			for n, data in progressbar.progressbar(enumerate(train_loader), max_value=len(train_set)//batch_size-1):
+			#for n, data in enumerate(train_loader):
 				if stereoboolean:
 					train_data = torch.cat([data[0][0], data[0][1]], axis=1)
 				else:
