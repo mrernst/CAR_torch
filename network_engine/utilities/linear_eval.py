@@ -40,13 +40,13 @@ if __name__ == "__main__":
 		if 'osycb' in ds:
 			tfs = transforms.Compose([
 				transforms.ToTensor(),
-				transforms.Normalize(0, 1)
+				transforms.Normalize((0.,0.,0.), (1.,1.,1.))
 			])
 		else:
 			tfs = transforms.Compose([
 				transforms.Grayscale(),
 				transforms.ToTensor(),
-				transforms.Normalize(0, 1)
+				transforms.Normalize((0.,), (1.,))	
 			])
 		
 		
