@@ -58,7 +58,9 @@ if __name__ == "__main__":
 			stereo=stereoboolean,
 			transform=tfs
 			)
-	
+		
+		#train_set = Subset(train_set, np.arange(0,5000))
+		
 		train_loader = DataLoader(
 		dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
 		
@@ -72,6 +74,7 @@ if __name__ == "__main__":
 			transform=tfs
 		)
 		
+		#test_set = Subset(test_set, np.arange(0,1000))
 		
 		test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
 		
@@ -94,11 +97,20 @@ if __name__ == "__main__":
 				print('Dataset: {}, stereo: {}'.format(ds, stereoboolean))
 				print('Epoch: {} - accuracy (SGD): {}'.format(e, acc))
 				print('***********')
+				with open('results.txt', 'a') as f:
+					f.write('***********\n')
+					f.write('Dataset: {}, stereo: {}\n'.format(ds, stereoboolean))
+					f.write('Epoch: {} - accuracy (SGD): {}\n'.format(e, acc))
+				
 				final_acc = max(final_acc, acc)
 		
-		print('***********')
-		print('final accuracy (SGD): {}'.format(final_acc))
-		print('***********')
+		# print('***********')
+		# print('final accuracy (SGD): {}'.format(final_acc))
+		# print('***********')
+		with open('results.txt', 'a') as f:
+			f.write('***********\n')
+			f.write('{}, stereo: {}, accuracy (SGD): {}\n'.format(ds, stereoboolean, final_acc))
+			f.write('***********\n')
 
 
 		
