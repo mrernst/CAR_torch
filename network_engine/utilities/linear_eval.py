@@ -79,8 +79,7 @@ if __name__ == "__main__":
 			
 			#train_set = Subset(train_set, np.arange(0,5000))
 			
-			train_loader = DataLoader(
-			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
+
 			
 			
 			test_set = StereoImageFolder(
@@ -94,8 +93,13 @@ if __name__ == "__main__":
 			
 			#test_set = Subset(test_set, np.arange(0,1000))
 			
-			test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
+			
 		
+		train_loader = DataLoader(
+			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
+		
+		test_loader = torch.utils.data.DataLoader(test_set
+			batch_size=batch_size, shuffle=False, num_workers=8)
 		
 		logit_sgd = linear_model.SGDClassifier(max_iter=10000)
 		final_acc = 0
