@@ -114,7 +114,8 @@ if __name__ == "__main__":
 				else:
 					train_data = data[0]
 				train_targets = data[1]
-				train_data = train_data.reshape(batch_size,-1)
+				b = train_data.shape[0]
+				train_data = train_data.reshape(b,-1)
 				logit_sgd.partial_fit(train_data, train_targets, classes=no_of_classes)
 			if (e+1)%5 == 0:
 				acc = evaluate(test_loader)
