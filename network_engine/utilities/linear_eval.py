@@ -61,6 +61,8 @@ if __name__ == "__main__":
 			for percentage in [40,60,80]:
 				train_set._add_data('/home/aecgroup/aecdata/Textures/occluded/datasets/{}/{}/'.format(ds, percentage))
 				test_set._add_data('/home/aecgroup/aecdata/Textures/occluded/datasets/{}/{}/'.format(ds, percentage))
+			
+			no_of_classes = np.arange(79)
 		else:
 			tfs = transforms.Compose([
 				transforms.Grayscale(),
@@ -91,6 +93,7 @@ if __name__ == "__main__":
 				transform=tfs
 			)
 			
+			no_of_classes = np.arange(10)
 			#test_set = Subset(test_set, np.arange(0,1000))
 			
 			
@@ -112,7 +115,7 @@ if __name__ == "__main__":
 					train_data = data[0]
 				train_targets = data[1]
 				train_data = train_data.reshape(batch_size,-1)
-				logit_sgd.partial_fit(train_data, train_targets, classes=np.arange(10))
+				logit_sgd.partial_fit(train_data, train_targets, classes=no_of_classes)
 			if (e+1)%5 == 0:
 				acc = evaluate(test_loader)
 				print('***********')
