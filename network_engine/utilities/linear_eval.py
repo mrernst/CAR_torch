@@ -29,7 +29,8 @@ if __name__ == "__main__":
 			else:
 				test_data = data[0]
 			test_targets = data[1]
-			test_data = test_data.reshape(batch_size,-1)
+			b = test_data.shape[0]
+			test_data = test_data.reshape(b,-1)
 			acc = metrics.accuracy_score(test_targets, logit_sgd.predict(test_data))
 			#print('partial', acc)
 			accuracies.append(acc)
