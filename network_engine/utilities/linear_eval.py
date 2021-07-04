@@ -98,7 +98,7 @@ if __name__ == "__main__":
 		train_loader = DataLoader(
 			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
 		
-		test_loader = torch.utils.data.DataLoader(test_set
+		test_loader = torch.utils.data.DataLoader(test_set, 
 			batch_size=batch_size, shuffle=False, num_workers=8)
 		
 		logit_sgd = linear_model.SGDClassifier(max_iter=10000)
