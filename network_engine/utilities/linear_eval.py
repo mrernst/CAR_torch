@@ -16,10 +16,10 @@ if __name__ == "__main__":
 	batch_size = 500
 	epochs = 100
 	dataset_list = [
-		('osfmnist2c', False),('osfmnist2r', False),('osycb', False),
+		('osycb2', False),
 		('osmnist2c', True),('osmnist2r', True),('osfmnist2c', True),('osfmnist2r', True),('osycb', True)
 		]
-		#('osmnist2c', False),('osmnist2r', False), #DONE
+		#('osmnist2c', False),('osmnist2r', False), ('osfmnist2c', False),('osfmnist2r', False), #DONE
 	
 	def evaluate(loader):
 		accuracies = []
@@ -43,41 +43,58 @@ if __name__ == "__main__":
 				transforms.ToTensor(),
 				transforms.Normalize((0.,0.,0.), (1.,1.,1.))
 			])
+		
+			train_set = StereoImageFolder(
+				root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/{}/'.format(ds, 20),
+				train=True,
+				stereo=stereoboolean,
+				transform=tfs
+				)
+				
+			test_set = StereoImageFolder(
+				root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/{}/'.format(ds, 20),
+				train=False,
+				stereo=stereoboolean,
+				transform=tfs
+				)
+			
+			for percentage in [40,60,80]:
+				train_set._add_data('/home/aecgroup/aecdata/Textures/occluded/datasets/{}/{}/'.format(ds, percentage))
+				test_set._add_data('/home/aecgroup/aecdata/Textures/occluded/datasets/{}/{}/'.format(ds, percentage))
 		else:
 			tfs = transforms.Compose([
 				transforms.Grayscale(),
 				transforms.ToTensor(),
 				transforms.Normalize((0.,), (1.,))	
 			])
-		
-		
-		train_set = StereoImageFolder(
-			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
-			#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
-			root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
-			train=True,
-			stereo=stereoboolean,
-			transform=tfs
+			
+			train_set = StereoImageFolder(
+				#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
+				#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
+				root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
+				train=True,
+				stereo=stereoboolean,
+				transform=tfs
+				)
+			
+			#train_set = Subset(train_set, np.arange(0,5000))
+			
+			train_loader = DataLoader(
+			dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
+			
+			
+			test_set = StereoImageFolder(
+				#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
+				#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
+				root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
+				train=False,
+				stereo=stereoboolean,
+				transform=tfs
 			)
-		
-		#train_set = Subset(train_set, np.arange(0,5000))
-		
-		train_loader = DataLoader(
-		dataset=train_set, batch_size=batch_size, shuffle=True, num_workers=8)
-		
-		
-		test_set = StereoImageFolder(
-			#root_dir='/Users/markus/Research/Code/titan/datasets/osmnist2_0occ/',
-			#root_dir='/Users/markus/Research/Code/titan/datasets/{}_reduced/'.format(ds),
-			root_dir='/home/aecgroup/aecdata/Textures/occluded/datasets/{}/'.format(ds),
-			train=False,
-			stereo=stereoboolean,
-			transform=tfs
-		)
-		
-		#test_set = Subset(test_set, np.arange(0,1000))
-		
-		test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
+			
+			#test_set = Subset(test_set, np.arange(0,1000))
+			
+			test_loader = torch.utils.data.DataLoader(test_set, batch_size=batch_size, shuffle=False, num_workers=8)
 		
 		
 		logit_sgd = linear_model.SGDClassifier(max_iter=10000)
