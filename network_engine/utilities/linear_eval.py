@@ -16,10 +16,9 @@ if __name__ == "__main__":
 	batch_size = 500
 	epochs = 100
 	dataset_list = [
-		('osycb2', False),
-		('osmnist2c', True),('osmnist2r', True),('osfmnist2c', True),('osfmnist2r', True),('osycb', True)
+		('osmnist2r', True),('osfmnist2c', True),('osfmnist2r', True),('osycb', True)
 		]
-		#('osmnist2c', False),('osmnist2r', False), ('osfmnist2c', False),('osfmnist2r', False), #DONE
+		#('osycb2', False), ('osmnist2c', True),('osmnist2c', False),('osmnist2r', False), ('osfmnist2c', False),('osfmnist2r', False), #DONE
 	
 	def evaluate(loader):
 		accuracies = []
