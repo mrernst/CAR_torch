@@ -78,7 +78,28 @@ try:
 except ImportError:
     pass
 
-
+# calculate the gini coefficient from a numpy array
+def gini(array):
+    """Calculate the Gini coefficient of a numpy array."""
+    # based on bottom eq:
+    # http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
+    # from:
+    # http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
+    # All values are treated equally, arrays must be 1d:
+    array = array.flatten()
+    if np.amin(array) < 0:
+        # Values cannot be negative:
+        array -= np.amin(array)
+    # Values cannot be 0:
+    array += 0.0000001
+    # Values must be sorted:
+    array = np.sort(array)
+    # Index per array element:
+    index = np.arange(1,array.shape[0]+1)
+    # Number of array elements:
+    n = array.shape[0]
+    # Gini coefficient:
+    return ((np.sum((2 * index - n  - 1) * array)) / (n * np.sum(array)))
 
 # ----------------
 # create anaglyphs
@@ -225,6 +246,7 @@ def plot_distribution(measure, ax, lab=None, xlabel=''):
         ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
     ax.axvline(x=measure.mean()+measure.std(),
         ymin=0.0, ymax = 5, linewidth=1, color='gray', linestyle='--')
+
 # ---------------------
 # make custom image annotations
 # ---------------------
@@ -921,7 +943,9 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
             #ax[row,ti].contour(threshold_map, levels=[1.0], colors='red', linewidths=[0.5],
             #    extent=[0-0.5, x[:-1].max()-0.5,0-0.5, y[:-1].max()-0.5])
             
-            ax[row,ti].set_xlabel('{}|{} [{},{}]'.format(preds[ind,ti,0], n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2]), fontsize=12)
+            g = gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
+
+            ax[row,ti].set_xlabel('{}|{} [{},{}]\n g={:0.3f}'.format(preds[ind,ti,0], n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2], g), fontsize=12)
             ax[row,ti].set_yticks([])
             ax[row,ti].set_xticks([])
             
@@ -1055,7 +1079,8 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, list_of_indices=[948
         bbox=dict(boxstyle='square', fc='white', ec='white'),
         #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
         )
-        ax[row,1].set_xlabel('prediction: {}'.format(preds[ind,ti,0]), fontsize=12)
+        g = gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
+        ax[row,1].set_xlabel('pred.: {}, g={:0.3f}'.format(preds[ind,ti,0], g), fontsize=12)
         
         ti = 3
         min, max = (cams[ind,ti,preds[ind,ti,0],:,:]).min(), (cams[ind,ti,preds[ind,ti,0],:,:]).max()
@@ -1065,7 +1090,8 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, list_of_indices=[948
         bbox=dict(boxstyle='square', fc='white', ec='white'),
         #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
         )
-        ax[row,2].set_xlabel('prediction: {}'.format(preds[ind,ti,0]), fontsize=12)
+        g = gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
+        ax[row,2].set_xlabel('pred.: {}, g={:0.3f}'.format(preds[ind,ti,0], g), fontsize=12)
         for ti in range(t):
             ax[row,ti].set_yticks([])
             ax[row,ti].set_xticks([])
@@ -1387,10 +1413,12 @@ def plot_cam_means2(cams_list, targets, probs, preds):
             dict_of_metric[ti] = []
             list_of_data = []
             list_of_fitted_data = []
+            ginis = []
             
             for j in range(b):
                 # insert real data here
                 data_noisy = cams_by_row[row][j,ti,:,:].numpy()
+                ginis.append(gini(data_noisy))
                 x_init, y_init = np.where(data_noisy == np.amax(data_noisy))
                 initial_guess_2 = (3.,x_init[0],y_init[0],5,5,0.,10.)
                 data_noisy = np.reshape(data_noisy,h*w)
@@ -1444,7 +1472,9 @@ def plot_cam_means2(cams_list, targets, probs, preds):
 
             ax[2,0].set_ylabel('center', fontsize=12)
             ax[2,ti].plot(16, 16, marker="+", color='black', markersize=5.0, markeredgewidth=.25)
-
+            
+            ax[row,ti].set_xlabel('g={:0.3f}'.format(np.mean(ginis)))
+            print('[INFO] row: {} ti: {} - gini coefficient mean: {:0.3f}, std: {:0.3f}'.format(row, ti, np.mean(ginis), np.std(ginis)))
         
         # T-Test mit Bonferroni Korrektur nach Benjamini Hochberg
         qstar = 0.05
