@@ -107,8 +107,8 @@ if __name__ == "__main__":
 		logit_sgd = linear_model.SGDClassifier(max_iter=10000)
 		final_acc = 0
 		for e in progressbar.progressbar(range(epochs)):
-			for n, data in progressbar.progressbar(enumerate(train_loader)):
-			#for n, data in enumerate(train_loader):
+			#for n, data in progressbar.progressbar(enumerate(train_loader)):
+			for n, data in enumerate(train_loader):
 				if stereoboolean:
 					train_data = torch.cat([data[0][0], data[0][1]], axis=1)
 				else:
