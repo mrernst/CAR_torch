@@ -6,11 +6,12 @@
 #SBATCH --time=700:00:00 
 #SBATCH --mem=30GB 
 #SBATCH --exclude vane 
+#SBATCH --nodelist turbine
 #SBATCH --partition=sleuths 
 #SBATCH --job-name=linear_evaluation 
 #SBATCH --mail-type=END 
 #SBATCH --mail-user=mernst@fias.uni-frankfurt.de 
-#SBATCH --output=/home/mernst/git/titan/network_engine/utilities/noname_experiment_slurm_%j.out 
+#SBATCH --output=/home/mernst/git/titan/network_engine/utilities/lineval_slurm_%j.out 
 
 j=$((SLURM_ARRAY_TASK_ID)) 
 for i in `seq 1 1 1` 
