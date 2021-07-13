@@ -12,12 +12,13 @@
 #SBATCH --mail-type=END 
 #SBATCH --mail-user=mernst@fias.uni-frankfurt.de 
 #SBATCH --output=/home/mernst/git/titan/network_engine/utilities/lineval_slurm_%j.out 
+#SBATCH --array=0-3%4
 
 j=$((SLURM_ARRAY_TASK_ID)) 
 for i in `seq 1 1 1` 
 do 
     echo "iteration $i" 
     echo "job $j" 
-    srun python3 linear_eval.py
+    srun python3 linear_eval.py --job_id $j
 done 
 # --- end of experiment --- 

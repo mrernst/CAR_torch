@@ -7,8 +7,19 @@ from torch.utils.data import DataLoader, Subset
 from sklearn import preprocessing, decomposition, naive_bayes, linear_model, metrics
 
 from dataset_handler import StereoImageFolder, StereoImageFolderLMDB
-
 import progressbar
+
+# FLAGS
+
+parser = argparse.ArgumentParser()
+parser.add_argument(
+	 "-job",
+	 "--job_id",
+	 type=str,
+	 default='00000',
+	 help='slurm job id passed to the results file')
+
+FLAGS = parser.parse_args()
 
 if __name__ == "__main__":
 	#Grayscale needs to drop when osycb is loaded
@@ -16,9 +27,8 @@ if __name__ == "__main__":
 	batch_size = 500
 	epochs = 100
 	dataset_list = [
-		('osmnist2r', True),('osfmnist2c', True),('osfmnist2r', True),('osycb', True)
+		('osmnist2c', False), ('osmnist2r', False), ('osfmnist2c', False),('osfmnist2r', False), ('osycb2', False), ('osmnist2c', True), ('osmnist2r', True), ('osfmnist2c', True), ('osfmnist2r', True), ('osycb2', True)
 		]
-		#('osycb2', False), ('osmnist2c', True),('osmnist2c', False),('osmnist2r', False), ('osfmnist2c', False),('osfmnist2r', False), #DONE
 	
 	def evaluate(loader):
 		accuracies = []
@@ -133,7 +143,7 @@ if __name__ == "__main__":
 		# print('***********')
 		# print('final accuracy (SGD): {}'.format(final_acc))
 		# print('***********')
-		with open('results.txt', 'a') as f:
+		with open('results_{}.txt'.format(FLAGS.job_id), 'a') as f:
 			f.write('***********\n')
 			f.write('{}, stereo: {}, accuracy (SGD): {}\n'.format(ds, stereoboolean, final_acc))
 			f.write('***********\n')
