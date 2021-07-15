@@ -542,6 +542,26 @@ def plot_classes_preds(output, images, labels, classes):
 
 
 # -----------------
+# sensitivity of concentration
+# -----------------
+
+def plot_concentration_mass(target_percentage, occluder_percentage, overlap_percentage, background_percentage, filename):
+    target_percentage *= 100
+    occluder_percentage *= 100
+    overlap_percentage *= 100
+    background_percentage *= 100
+    
+    plt.errorbar(np.arange(0,4), target_percentage.mean(axis=0), yerr=target_percentage.std(axis=0), xerr=None, fmt='o-', label='target')
+    plt.errorbar(np.arange(0,4), occluder_percentage.mean(axis=0), yerr=occluder_percentage.std(axis=0), xerr=None, fmt='o-', label='occluder')
+    plt.errorbar(np.arange(0,4), overlap_percentage.mean(axis=0), yerr=overlap_percentage.std(axis=0), xerr=None, fmt='o-', label='overlap')
+    plt.errorbar(np.arange(0,4), background_percentage.mean(axis=0), yerr=background_percentage.std(axis=0), xerr=None, fmt='o-', label='background')
+    plt.xlabel("timesteps")
+    plt.ylabel("percentage")
+    plt.legend()
+    plt.savefig(filename)
+    plt.close()
+
+# -----------------
 # class activation mapping
 # -----------------
 
@@ -848,7 +868,7 @@ def show_cam_means(cams, targets, probs, preds):
     plt.show()
     pass
     
-def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614,541], alpha=0.5):
+def plot_cam_samples(cams, pics, targets, probs, preds, filename, list_of_indices=[948,614,541], alpha=0.5):
     """
     cams (b,t,n_classes,h,w)   Class Activation Maps
     pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
@@ -1008,10 +1028,10 @@ def plot_cam_samples(cams, pics, targets, probs, preds, list_of_indices=[948,614
     verticalalignment='center')
 
 
-    plt.savefig('/Users/markus/Desktop/cam_samples.pdf')
-    plt.show()
+    plt.savefig(filename, dpi=300, format='pdf')
+    plt.close()
 
-def plot_cam_samples_alt(cams, pics, targets, probs, preds, list_of_indices=[948,614,541], alpha=0.5):
+def plot_cam_samples_alt(cams, pics, targets, probs, preds, filename, list_of_indices=[948,614,541], alpha=0.5):
     """
     cams (b,t,n_classes,h,w)   Class Activation Maps
     pics (b,t,n_channels,h,w)  Input Images for Recurrent Network
@@ -1148,8 +1168,8 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, list_of_indices=[948
     verticalalignment='center')
 
 
-    plt.savefig('/Users/markus/Desktop/cam_samples.pdf')
-    plt.show()
+    plt.savefig(filename, dpi=300, format='pdf')
+    plt.close()
 
 
 
@@ -1329,7 +1349,7 @@ def plot_cam_means(cams, targets, probs, preds):
     plt.show()
     
 
-def plot_cam_means2(cams_list, targets, probs, preds):
+def plot_cam_means2(cams_list, targets, probs, preds, filename):
     
     b,t,n_classes,h,w = cams_list[0].shape
     n_rows = 3
@@ -1473,7 +1493,7 @@ def plot_cam_means2(cams_list, targets, probs, preds):
             ax[2,0].set_ylabel('center', fontsize=12)
             ax[2,ti].plot(16, 16, marker="+", color='black', markersize=5.0, markeredgewidth=.25)
             
-            ax[row,ti].set_xlabel('g={:0.3f}'.format(np.mean(ginis)))
+            #ax[row,ti].set_xlabel('g={:0.3f}'.format(np.mean(ginis)))
             print('[INFO] row: {} ti: {} - gini coefficient mean: {:0.3f}, std: {:0.3f}'.format(row, ti, np.mean(ginis), np.std(ginis)))
         
         # T-Test mit Bonferroni Korrektur nach Benjamini Hochberg
@@ -1555,8 +1575,8 @@ def plot_cam_means2(cams_list, targets, probs, preds):
     # Annotate
     ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,+12]), weight='bold', fontsize=24)
     
-    plt.savefig('/Users/markus/Desktop/cammeans.pdf', dpi=300, format='pdf')
-    plt.show()
+    plt.savefig(filename, dpi=300, format='pdf')
+    plt.close()
 
 # -----------------
 # tsne and softmax output functions
@@ -2028,7 +2048,7 @@ def plot_tsne_evolution(representations, imgs, targets, show_stimuli=False, show
     pass
 
 
-def plot_tsne_evolution2(representations, imgs, targets, show_stimuli=True, show_indices=True, N=25, savefile='./../trained_models/tsnesave', overwrite=False):
+def plot_tsne_evolution2(representations, imgs, targets, show_stimuli=True, show_indices=True, N=25, savefile='./../trained_models/tsnesave', overwrite=False, filename='tsne.pdf'):
     
     # hack to mitigate output
     from matplotlib.axes._axes import _log as matplotlib_axes_logger
@@ -2286,14 +2306,14 @@ def plot_tsne_evolution2(representations, imgs, targets, show_stimuli=True, show
         ax.text(-0.1, 1.05, string.ascii_uppercase[n], weight='bold', transform=ax.transAxes, size=18)
     
     plt.subplots_adjust(left=None, bottom=None, right=None, top=None, wspace=None, hspace=0.3)
-    plt.savefig('/Users/markus/Desktop/tsne.pdf', dpi=300, format='pdf')
+    plt.savefig(filename, dpi=300, format='pdf')
     plt.show()
     pass
 
 
 
 
-def plot_relative_distances(representations, nhot_targets, representations_unocc, onehot_targets_unocc):
+def plot_relative_distances(representations, nhot_targets, representations_unocc, onehot_targets_unocc, filename):
     
     classes = 10
     n_occ = 2
@@ -2420,11 +2440,11 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     #     ], test='Kolmogorov-Smirnov-ls', text_format='star', loc='inside', verbose=2)
     ax.annotate('B', xy=(ax.get_xlim()[0],ax.get_ylim()[1]), xytext=np.array([ax.get_xlim()[0],ax.get_ylim()[1]])+np.array([-0.75,0.25]), weight='bold', fontsize=16)
     
-    plt.show()
+    plt.savefig(filename, dpi=300, format='pdf')
     
     pass
 
-def plot_softmax_output(network_output, targets, images):
+def plot_softmax_output(network_output, targets, images, filename):
     prop_cycle = plt.rcParams['axes.prop_cycle']
     colors = prop_cycle.by_key()['color']
     
@@ -2574,7 +2594,7 @@ def plot_softmax_output(network_output, targets, images):
     #plt.suptitle('Mean softmax output over candidates for each target')
     #plt.savefig('mean_softmax.pdf')
     axes[0,0].annotate('B', xy=(axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]), xytext=np.array([axes[0,0].get_xlim()[0],axes[0,0].get_ylim()[1]])+np.array([-9,+2]), weight='bold', fontsize=16)
-    plt.savefig('/Users/markus/Desktop/softmaxB.pdf', dpi=300, format='pdf')
+    plt.savefig('{}B.pdf'.format(filename), dpi=300, format='pdf')
     #plt.show()
     
     
@@ -2709,7 +2729,7 @@ def plot_softmax_output(network_output, targets, images):
 
     plt.subplots_adjust(left=None, bottom=0.25, right=None,
                         top=0.85, wspace=None, hspace=None)
-    plt.savefig('/Users/markus/Desktop/softmaxA.pdf', dpi=300, format='pdf')
+    plt.savefig('{}A.pdf'.format(filename), dpi=300, format='pdf')
     #plt.show()
     pass
 
