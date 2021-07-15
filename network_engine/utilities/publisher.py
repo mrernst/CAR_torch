@@ -163,6 +163,8 @@ def compare_concentration_mass(rgb_loader, test_loader, network, timesteps, ster
 		target_pixel_percentages = []
 		occluder_percentages = []
 		occluder_pixel_percentages = []
+		overlap_percentages = []
+		overlap_pixel_percentages = []
 		background_percentages = []
 		background_pixel_percentages = []
 
@@ -199,14 +201,20 @@ def compare_concentration_mass(rgb_loader, test_loader, network, timesteps, ster
 			
 			mass_perc_on_background = np.zeros([b, timesteps])
 			mass_perc_on_background_pixel = np.zeros([b, timesteps])
+			
+			mass_perc_on_overlap = np.zeros([b, timesteps])
+			mass_perc_on_overlap_pixel = np.zeros([b, timesteps])
 
 			# R: target, G: occluder, B: overlap, None: background) 
 			# R and B: targets
-			tar_pixels = rgb[0][0][:, 0, :, :] + rgb[0][0][:, 2, :, :]
+			tar_pixels = rgb[0][0][:, 0, :, :]# + rgb[0][0][:, 2, :, :]
 			# G and B: occluders
-			occ_pixels = rgb[0][0][:, 1, :, :] + rgb[0][0][:, 2, :, :]
+			occ_pixels = rgb[0][0][:, 1, :, :]# + rgb[0][0][:, 2, :, :]
+			#
+			ovl_pixels = rgb[0][0][:, 2, :, :]
 			# None
 			background_pixels = (-1)*(rgb[0][0][:, 0, :, :] + rgb[0][0][:, 1, :, :] + rgb[0][0][:, 2, :, :]) + 1
+			
 			
 			
 			for ti in range(timesteps):
@@ -224,7 +232,10 @@ def compare_concentration_mass(rgb_loader, test_loader, network, timesteps, ster
 						mass_perc_on_occluder_pixel[ind, ti] = mass_perc_on_occluder[ind, ti] / (occ_pixels[ind] > 0).sum()
 
 						mass_perc_on_background[ind, ti] = (c[background_pixels[ind] > 0].sum() / total_mass)
-						mass_perc_on_background_pixel[ind, ti] = mass_perc_on_occluder[ind, ti] / (background_pixels[ind] > 0).sum()
+						mass_perc_on_background_pixel[ind, ti] = mass_perc_on_background[ind, ti] / (background_pixels[ind] > 0).sum()
+						
+						mass_perc_on_overlap[ind, ti] = (c[ovl_pixels[ind] > 0].sum() / total_mass)
+						mass_perc_on_overlap_pixel[ind, ti] = mass_perc_on_overlap[ind, ti] / (ovl_pixels[ind] > 0).sum()
 					else:
 						pass
 
@@ -234,6 +245,8 @@ def compare_concentration_mass(rgb_loader, test_loader, network, timesteps, ster
 			occluder_pixel_percentages.append(mass_perc_on_occluder_pixel.copy())
 			background_percentages.append(mass_perc_on_background.copy())
 			background_pixel_percentages.append(mass_perc_on_background_pixel.copy())
+			overlap_percentages.append(mass_perc_on_overlap.copy())
+			overlap_pixel_percentages.append(mass_perc_on_overlap_pixel.copy())
 
 		
 		target_percentages = np.concatenate(target_percentages, axis=0)
@@ -242,9 +255,11 @@ def compare_concentration_mass(rgb_loader, test_loader, network, timesteps, ster
 		occluder_pixel_percentages = np.concatenate(occluder_pixel_percentages, axis=0)
 		background_percentages = np.concatenate(background_percentages, axis=0)
 		background_pixel_percentages = np.concatenate(background_pixel_percentages, axis=0)
+		overlap_percentages = np.concatenate(overlap_percentages, axis=0)
+		overlap_pixel_percentages = np.concatenate(overlap_pixel_percentages, axis=0)
 
 		
-		return target_percentages, target_pixel_percentages, occluder_percentages, occluder_pixel_percentages, background_percentages, background_pixel_percentages
+		return target_percentages, target_pixel_percentages, occluder_percentages, occluder_pixel_percentages, overlap_percentages, overlap_pixel_percentages, background_percentages, background_pixel_percentages
 	
 
 
@@ -281,8 +296,8 @@ def fig_cam(network, test_transform, configuration_dict, sample_size, random_see
 	#     )    
 	
 
-	visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/cam_samples.pdf'.format(configuration_dict['visualization_dir']))
-	visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/cam_samples_alt.pdf'.format(configuration_dict['visualization_dir']))
+	visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/fig8a_cam_samples.pdf'.format(configuration_dict['visualization_dir']))
+	visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/fig8a_cam_samples_alt.pdf'.format(configuration_dict['visualization_dir']))
 	# np.random.choice(np.arange(1000),10)
 	# visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741, 309, 289])
 	# visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741])
@@ -315,7 +330,7 @@ def fig_cam(network, test_transform, configuration_dict, sample_size, random_see
 		prob3.append(topk_prob)
 		pred3.append(topk_pred)
 	
-	visualizer.plot_cam_means2(c3, t3, prob3, pred3, filename='{}/cam_means.pdf'.format(configuration_dict['visualization_dir']))
+	visualizer.plot_cam_means2(c3, t3, prob3, pred3, filename='{}/fig8b_cam_means.pdf'.format(configuration_dict['visualization_dir']))
 
 
 def fig_softmax_and_tsne(network, test_transform, configuration_dict, sample_size, random_seed):
@@ -469,10 +484,10 @@ def fig_concentration(network, test_transform, configuration_dict, sample_size, 
 	
 	
 	
-	tp, tpp, op, opp, bp, bpp = compare_concentration_mass(rgb_loader, cos_loader, network, configuration_dict['time_depth'] + 1, configuration_dict['stereo'])
+	tp, tpp, op, opp, ovlp, ovlpp, bp, bpp = compare_concentration_mass(rgb_loader, cos_loader, network, configuration_dict['time_depth'] + 1, configuration_dict['stereo'])
 	
-	visualizer.plot_concentration_mass(tp, op, np.zeros([100,4]), bp, filename='{}/fig8c_percentage.pdf'.format(configuration_dict['visualization_dir']))
-	visualizer.plot_concentration_mass(tpp, opp, np.zeros([100,4]), bpp, filename='{}/fig8c_pixelpercentage.pdf'.format(configuration_dict['visualization_dir']))        
+	visualizer.plot_concentration_mass(tp, op, ovlp, bp, filename='{}/fig8c_percentage.pdf'.format(configuration_dict['visualization_dir']))
+	visualizer.plot_concentration_mass(tpp, opp, ovlpp, bpp, filename='{}/fig8c_pixelpercentage.pdf'.format(configuration_dict['visualization_dir']))        
 
 	pass
 
