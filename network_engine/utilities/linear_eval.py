@@ -133,7 +133,7 @@ if __name__ == "__main__":
 				print('Dataset: {}, stereo: {}'.format(ds, stereoboolean))
 				print('Epoch: {} - accuracy (SGD): {}'.format(e, acc))
 				print('***********')
-				with open('results.txt', 'a') as f:
+				with open('results_{}.txt'.format(FLAGS.job_id), 'a') as f:
 					f.write('***********\n')
 					f.write('Dataset: {}, stereo: {}\n'.format(ds, stereoboolean))
 					f.write('Epoch: {} - accuracy (SGD): {}\n'.format(e, acc))
