@@ -38,8 +38,10 @@ Temporary Items
 __pycache__
 tfrecord_files
 data
+datasets/os*
+datasets/vae*
 MNIST
-osmnist2r_reduced
+datasets/concentration_of_sensitivity/
 
 # Directories that will be filled by data /3rd party tools
 experiments/*
@@ -47,6 +49,4 @@ trained_models/*
 network_engine/utilities/tsne/*
 network_engine/utilities/vae/*
 
-# change in future
-datasets/os*
-datasets/vae*
+
