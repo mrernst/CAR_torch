@@ -201,6 +201,7 @@ class ExperimentEnvironment(object):
 
     def update_parameters(self):
         self.parameters['output_dir'] = [self.data_dir]
+        self.parameters['visualization_dir'] = [self.visualization_dir_dir]
         return self.parameters
 
     def est_folder_structure(self):
@@ -228,12 +229,12 @@ class ExperimentEnvironment(object):
         self.config_dir = self.experiment_dir + "files/config_files/"
         self.files_dir = self.experiment_dir + "files/"
         self.data_dir = self.experiment_dir + "data/"
-        self.visualization = self.experiment_dir + "visualization/"
+        self.visualization_dir = self.experiment_dir + "visualization/"
 
         self.slurm_dir = self.files_dir + "slurm_output/"
         mkdir_p(self.experiment_dir)
         mkdir_p(self.data_dir)
-        mkdir_p(self.visualization)
+        mkdir_p(self.visualization_dir)
         mkdir_p(self.slurm_dir)
         mkdir_p(self.config_dir)
 
