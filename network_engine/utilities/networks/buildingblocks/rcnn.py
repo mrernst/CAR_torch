@@ -50,6 +50,7 @@ import torch
 
 # custom functions
 # -----
+import utilities.metrics as metrics
 
 # -----------------
 # Network Constructor
@@ -57,6 +58,47 @@ import torch
 
 def return_same(x):
     return x
+
+# -----------------
+# Simplified Generalized Linear Model (GLM)
+# -----------------
+
+class GLM(nn.Module):
+    def __init__(self, image_size=1024, input_channels=1, num_targets=10):
+        super(GLM, self).__init__()
+        self.n_features = image_size*input_channels
+        self.fc = nn.Linear(self.n_features, num_targets)
+
+    def forward(self, x):
+        seq_len = x.size(1)
+        output_list = []
+        feature_map = x
+        for t in range(seq_len):
+            input = x[:, t, :, :, :].view(x.size(0), self.n_features)
+            output_list.append(self.fc(input))
+        x = torch.stack(output_list, dim=1)
+        return x, feature_map
+    
+    def log_stats(self, writer, step):
+        self._varstats2tb(self.fc.weight,
+            'linear/fc_weights', writer, step)
+        self._varstats2tb(self.fc.bias,
+            'linear/fc_bias', writer, step)
+            
+    def _varstats2tb(self, variable, name, writer, step):
+        variable = variable.detach()
+        writer.add_scalar(
+            'network/{}/mean'.format(name), variable.mean(), step)
+        writer.add_scalar(
+            'network/{}/std'.format(name), variable.std(), step)
+        writer.add_scalar(
+            'network/{}/min'.format(name), variable.min(), step)
+        writer.add_scalar(
+            'network/{}/max'.format(name), variable.max(), step)
+        writer.add_scalar(
+            'network/{}/median'.format(name), variable.median(), step)
+        writer.add_scalar(
+            'network/{}/gini'.format(name), metrics.gini(variable.numpy()), step)
 
 
 # -----------------
@@ -431,7 +473,7 @@ class RecConvNet(nn.Module):
         seq_len = x.size(1)
         output_list = []
         for t in range(seq_len):
-            input = x[:, t, :, :, :].view(x.shape[0], self.n_features) #8, 8 for osmnist
+            input = x[:, t, :, :, :].view(x.size(0), self.n_features) #8, 8 for osmnist
             output_list.append(self.fc(input))
         x = torch.stack(output_list, dim=1)
         return x, feature_map
@@ -466,6 +508,8 @@ class RecConvNet(nn.Module):
             'network/{}/max'.format(name), variable.max(), step)
         writer.add_scalar(
             'network/{}/median'.format(name), variable.median(), step)
+        writer.add_scalar(
+            'network/{}/gini'.format(name), metrics.gini(variable.numpy()), step)
 
 
 # _____________________________________________________________________________
