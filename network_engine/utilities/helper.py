@@ -290,6 +290,10 @@ def infer_additional_parameters(configuration_dict):
         configuration_dict['kernel_size'] = (3,3)
         configuration_dict['n_features'] = 32
         configuration_dict['network_depth'] = 4
+    elif 'GLM' in configuration_dict['connectivity']:
+        configuration_dict['kernel_size'] = (3,3)
+        configuration_dict['n_features'] = 32
+        configuration_dict['network_depth'] = 1
     else:
         configuration_dict['kernel_size'] = (3,3)
         configuration_dict['n_features'] = 32
