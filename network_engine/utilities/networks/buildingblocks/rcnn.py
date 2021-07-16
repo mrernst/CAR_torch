@@ -98,7 +98,7 @@ class GLM(nn.Module):
         writer.add_scalar(
             'network/{}/median'.format(name), variable.median(), step)
         writer.add_scalar(
-            'network/{}/gini'.format(name), metrics.gini_torch(variable, step)
+            'network/{}/gini'.format(name), metrics.gini_torch(variable), step)
 
 
 # -----------------
@@ -509,7 +509,7 @@ class RecConvNet(nn.Module):
         writer.add_scalar(
             'network/{}/median'.format(name), variable.median(), step)
         writer.add_scalar(
-            'network/{}/gini'.format(name), metrics.gini_torch(variable, step)
+            'network/{}/gini'.format(name), metrics.gini_torch(variable), step)
 
 
 # _____________________________________________________________________________
