@@ -60,6 +60,7 @@ import torchvision.transforms as transforms
 
 import argparse
 import os
+import sys
 import random
 import time
 import math
@@ -70,8 +71,7 @@ import math
 import utilities.afterburner as afterburner
 import utilities.helper as helper
 import utilities.visualizer as visualizer
-import utilities.distancemetrics as distancemetrics
-from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
+from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM, GLM
 from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder, AffineTransform
 
 def asMinutes(s):
@@ -524,15 +524,19 @@ if __name__ == '__main__':
     
     
     # configure network
-    network = RecConvNet(
-        CONFIG['connectivity'],
-        kernel_size=CONFIG['kernel_size'],
-        input_channels=CONFIG['image_channels'],
-        n_features=CONFIG['n_features'],
-        num_layers=CONFIG['network_depth'], 
-        num_targets=CONFIG['classes']
-        ).to(device)
-    
+    if CONFIG['connectivity'] == 'GLM':
+        network = GLM(
+            image_size=CONFIG['image_height']*CONFIG['image_width'], input_channels=CONFIG['image_channels'], num_targets=CONFIG['classes']).to(device)
+    else:
+        network = RecConvNet(
+            CONFIG['connectivity'],
+            kernel_size=CONFIG['kernel_size'],
+            input_channels=CONFIG['image_channels'],
+            n_features=CONFIG['n_features'],
+            num_layers=CONFIG['network_depth'], 
+            num_targets=CONFIG['classes']
+            ).to(device)
+
     
     criterion = nn.CrossEntropyLoss().to(device)
     
@@ -560,27 +564,29 @@ if __name__ == '__main__':
            
         # load library for analysis
         import utilities.publisher as publisher
-        SAMPLE_SIZE = 1000 # default is 10000
+        SAMPLE_SIZE = 10000 # default is 10000
 
         # visualize filters
         # -----
-        # publisher.first_layer_network_filters(network, test_transform, CONFIG, sample_size=1000, random_seed=1234)
+        #publisher.first_layer_network_filters(network, test_transform, CONFIG, sample_size=SAMPLE_SIZE, random_seed=1234)
         
         
         # softmax and tsne analysis
         # -----
-        publisher.fig_softmax_and_tsne(network, test_transform, CONFIG, sample_size=SAMPLE_SIZE, random_seed=1234)
+        #publisher.fig_softmax_and_tsne(network, test_transform, CONFIG, sample_size=SAMPLE_SIZE, random_seed=1234)
+        
+        
+        # analyze pixelwise concentration
+        # -----
+        #publisher.fig_concentration(network, test_transform, CONFIG, sample_size=SAMPLE_SIZE, random_seed=1234)
         
         
         # class activation map analysis
         # -----
         publisher.fig_cam(network, test_transform, CONFIG, sample_size=SAMPLE_SIZE, random_seed=1234)
         
-        
-        # analyze pixelwise concentration
-        # -----
-        publisher.fig_concentration(network, test_transform, CONFIG, sample_size=SAMPLE_SIZE, random_seed=1234)
     
+        sys.exit()
 
     # training loop
     
