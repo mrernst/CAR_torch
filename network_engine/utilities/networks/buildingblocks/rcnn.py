@@ -97,8 +97,8 @@ class GLM(nn.Module):
             'network/{}/max'.format(name), variable.max(), step)
         writer.add_scalar(
             'network/{}/median'.format(name), variable.median(), step)
-        # writer.add_scalar(
-        #     'network/{}/gini'.format(name), metrics.gini(variable.numpy()), step)
+        writer.add_scalar(
+            'network/{}/gini'.format(name), metrics.gini_torch(variable, step)
 
 
 # -----------------
@@ -508,8 +508,8 @@ class RecConvNet(nn.Module):
             'network/{}/max'.format(name), variable.max(), step)
         writer.add_scalar(
             'network/{}/median'.format(name), variable.median(), step)
-        # writer.add_scalar(
-        #     'network/{}/gini'.format(name), metrics.gini(variable.numpy()), step)
+        writer.add_scalar(
+            'network/{}/gini'.format(name), metrics.gini_torch(variable, step)
 
 
 # _____________________________________________________________________________

@@ -79,6 +79,28 @@ def gini(array):
     # Gini coefficient:
     return ((np.sum((2 * index - n  - 1) * array)) / (n * np.sum(array)))
 
+# calculate the gini coefficient from a torch array
+def gini_torch(array):
+    """Calculate the Gini coefficient of a numpy array."""
+    # based on bottom eq:
+    # http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
+    # from:
+    # http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
+    # All values are treated equally, arrays must be 1d:
+    array = array.flatten()
+    if torch.amin(array) < 0:
+        # Values cannot be negative:
+        array -= torch.amin(array)
+    # Values cannot be 0:
+    array += 0.0000001
+    # Values must be sorted:
+    array = torch.sort(array)[0]
+    # Index per array element:
+    index = torch.arange(1,array.shape[0]+1)
+    # Number of array elements:
+    n = array.shape[0]
+    # Gini coefficient:
+    return ((torch.sum((2 * index - n  - 1) * array)) / (n * torch.sum(array)))
 
 
 
