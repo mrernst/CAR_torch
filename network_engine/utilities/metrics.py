@@ -55,6 +55,7 @@ import hashlib
 
 from fractions import Fraction
 
+import torch
 
 # calculate the gini coefficient from a numpy array
 def gini(array):
