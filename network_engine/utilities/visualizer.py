@@ -69,7 +69,7 @@ from PIL import Image
 from textwrap import wrap
 from math import sqrt
 
-import utilities.distancemetrics as distancemetrics
+import utilities.metrics as metrics
 
 # van der Maaten TSNE implementations
 try:
@@ -77,29 +77,6 @@ try:
     import utilities.tsne.tsne as tsne
 except ImportError:
     pass
-
-# calculate the gini coefficient from a numpy array
-def gini(array):
-    """Calculate the Gini coefficient of a numpy array."""
-    # based on bottom eq:
-    # http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
-    # from:
-    # http://www.statsdirect.com/help/default.htm#nonparametric_methods/gini.htm
-    # All values are treated equally, arrays must be 1d:
-    array = array.flatten()
-    if np.amin(array) < 0:
-        # Values cannot be negative:
-        array -= np.amin(array)
-    # Values cannot be 0:
-    array += 0.0000001
-    # Values must be sorted:
-    array = np.sort(array)
-    # Index per array element:
-    index = np.arange(1,array.shape[0]+1)
-    # Number of array elements:
-    n = array.shape[0]
-    # Gini coefficient:
-    return ((np.sum((2 * index - n  - 1) * array)) / (n * np.sum(array)))
 
 # ----------------
 # create anaglyphs
@@ -551,15 +528,76 @@ def plot_concentration_mass(target_percentage, occluder_percentage, overlap_perc
     overlap_percentage *= 100
     background_percentage *= 100
     
-    plt.errorbar(np.arange(0,4), target_percentage.mean(axis=0), yerr=target_percentage.std(axis=0), xerr=None, fmt='o-', label='target')
-    plt.errorbar(np.arange(0,4), occluder_percentage.mean(axis=0), yerr=occluder_percentage.std(axis=0), xerr=None, fmt='o-', label='occluder')
-    plt.errorbar(np.arange(0,4), overlap_percentage.mean(axis=0), yerr=overlap_percentage.std(axis=0), xerr=None, fmt='o-', label='overlap')
-    plt.errorbar(np.arange(0,4), background_percentage.mean(axis=0), yerr=background_percentage.std(axis=0), xerr=None, fmt='o-', label='background')
-    plt.xlabel("timesteps")
-    plt.ylabel("percentage")
-    plt.legend()
+    fig, ax = plt.subplots(figsize=(4,4))
+    ax.errorbar(np.arange(0,4), target_percentage.mean(axis=0), yerr=target_percentage.std(axis=0), xerr=None, fmt='o-', label='target')
+    ax.errorbar(np.arange(0,4), occluder_percentage.mean(axis=0), yerr=occluder_percentage.std(axis=0), xerr=None, fmt='o-', label='occluder')
+    ax.errorbar(np.arange(0,4), overlap_percentage.mean(axis=0), yerr=overlap_percentage.std(axis=0), xerr=None, fmt='o-', label='overlap')
+    ax.errorbar(np.arange(0,4), background_percentage.mean(axis=0), yerr=background_percentage.std(axis=0), xerr=None, fmt='o-', label='background')
+    ax.set_xlabel("timesteps")
+    ax.set_ylabel("percentage")
+    ax.legend()
+    ax.set_xticks([0,1,2,3])
+    ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'])
     plt.savefig(filename)
     plt.close()
+    
+    # reform into a pandas dataframe
+    points, _ = target_percentage.shape
+    
+    concentration_df = pd.DataFrame(
+        np.hstack([
+        
+        np.vstack([background_percentage[:,0], np.repeat(0, points), np.repeat('background', points)]),
+        np.vstack([background_percentage[:,0], np.repeat(1, points), np.repeat('background', points)]),
+        np.vstack([background_percentage[:,0], np.repeat(2, points), np.repeat('background', points)]),
+        np.vstack([background_percentage[:,0], np.repeat(3, points), np.repeat('background', points)])
+        ,
+        np.vstack([occluder_percentage[:,0], np.repeat(0, points), np.repeat('occluder', points)]),
+        np.vstack([occluder_percentage[:,1], np.repeat(1, points), np.repeat('occluder', points)]),
+        np.vstack([occluder_percentage[:,2], np.repeat(2, points), np.repeat('occluder', points)]),
+        np.vstack([occluder_percentage[:,3], np.repeat(3, points), np.repeat('occluder', points)])
+        ,
+        np.vstack([overlap_percentage[:,0], np.repeat(0, points), np.repeat('overlap', points)]),
+        np.vstack([overlap_percentage[:,1], np.repeat(1, points), np.repeat('overlap', points)]),
+        np.vstack([overlap_percentage[:,2], np.repeat(2, points), np.repeat('overlap', points)]),
+        np.vstack([overlap_percentage[:,3], np.repeat(3, points), np.repeat('overlap', points)])
+        ,
+        np.vstack([target_percentage[:,0], np.repeat(0, points), np.repeat('target', points)]),
+        np.vstack([target_percentage[:,1], np.repeat(1, points), np.repeat('target', points)]),
+        np.vstack([target_percentage[:,2], np.repeat(2, points), np.repeat('target', points)]),
+        np.vstack([target_percentage[:,3], np.repeat(3, points), np.repeat('target', points)])
+        ]).T, columns=['data', 'timestep', 'type'])
+    concentration_df = concentration_df.explode('data')
+    concentration_df['data'] = concentration_df['data'].astype('float')
+    concentration_df = concentration_df.explode('timestep')
+    concentration_df['timestep'] = concentration_df['timestep'].astype('int')
+    with sns.axes_style("ticks"):
+        sns.set_context("paper", font_scale=1.0, )#rc={"lines.linewidth": 0.5})
+        fig, ax = plt.subplots(figsize=(4,4))
+        palette = sns.color_palette("colorblind")
+        palette = [sns.color_palette("colorblind")[7]] + sns.color_palette("colorblind")
+        sns.set_palette(palette)
+        sns.boxplot(data=concentration_df, x='timestep', y='data',
+        hue='type', showfliers = False, ax=ax
+        )
+        sns.despine(offset=10, trim=True)
+        ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=12)
+        ax.set_ylabel('Percentage')
+        ax.set_xlabel('Time step')
+        # from statannot import add_stat_annotation
+        # add_stat_annotation(ax, data=concentration_df, x='timestep', y='data', hue='type',
+        #     box_pairs=[
+        #         # ((0,1),(1,1)),
+        #         # ((1,1),(2,1)),
+        #         # ((0,2),(1,2)),
+        #         # ((1,2),(2,2)),
+        #         # ((2,1),(3,1)),
+        #         ((1, 'target'),(2, 'occluder')),
+        #         ((1, 'target'),(2, 'target')),
+        #     ], test='t-test_ind', text_format='star', loc='inside', verbose=2)
+        
+        plt.show()
+    
 
 # -----------------
 # class activation mapping
@@ -963,7 +1001,7 @@ def plot_cam_samples(cams, pics, targets, probs, preds, filename, list_of_indice
             #ax[row,ti].contour(threshold_map, levels=[1.0], colors='red', linewidths=[0.5],
             #    extent=[0-0.5, x[:-1].max()-0.5,0-0.5, y[:-1].max()-0.5])
             
-            g = gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
+            g = metrics.gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
 
             ax[row,ti].set_xlabel('{}|{} [{},{}]\n g={:0.3f}'.format(preds[ind,ti,0], n_hot_targets[ind,0], n_hot_targets[ind,1], n_hot_targets[ind,2], g), fontsize=12)
             ax[row,ti].set_yticks([])
@@ -1099,7 +1137,7 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, filename, list_of_in
         bbox=dict(boxstyle='square', fc='white', ec='white'),
         #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
         )
-        g = gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
+        g = metrics.gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
         ax[row,1].set_xlabel('pred.: {}, g={:0.3f}'.format(preds[ind,ti,0], g), fontsize=12)
         
         ti = 3
@@ -1110,7 +1148,7 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, filename, list_of_in
         bbox=dict(boxstyle='square', fc='white', ec='white'),
         #arrowprops=dict(arrowstyle='-[, widthB={}, lengthB=0.25, angleB=0'.format(3), lw=1.0)
         )
-        g = gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
+        g = metrics.gini(np.array(cams[ind,ti,preds[ind,ti,0],:,:]))
         ax[row,2].set_xlabel('pred.: {}, g={:0.3f}'.format(preds[ind,ti,0], g), fontsize=12)
         for ti in range(t):
             ax[row,ti].set_yticks([])
@@ -1418,7 +1456,9 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
     cams_by_row = cams_final
     row_x_shift = [-8,8,0]
     row_y_shift = [8,-8,0]
-    fig, ax = plt.subplots(n_rows, t+1)
+    fig, ax = plt.subplots(n_rows, t+1, gridspec_kw={
+           'width_ratios': [1, 1, 1, 1, 1],
+           'height_ratios': [1, 1, 1], 'left':0.05, 'right':0.875},)
     for row in range(n_rows):
         dict_of_metric = {}
         popt_list = []
@@ -1429,44 +1469,46 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
         upper_bound = (100,32,32,32.,32.,2*np.pi,100.)
         min = np.mean(cams_by_row[row].numpy(), axis=0).min()
         max = np.mean(cams_by_row[row].numpy(), axis=0).max()
+        ginis = np.zeros([b, t])
         for ti in range(t):
             dict_of_metric[ti] = []
             list_of_data = []
             list_of_fitted_data = []
-            ginis = []
             
             for j in range(b):
                 # insert real data here
                 data_noisy = cams_by_row[row][j,ti,:,:].numpy()
-                ginis.append(gini(data_noisy))
+                ginis[j,ti] = metrics.gini(data_noisy)
                 x_init, y_init = np.where(data_noisy == np.amax(data_noisy))
                 initial_guess_2 = (3.,x_init[0],y_init[0],5,5,0.,10.)
                 data_noisy = np.reshape(data_noisy,h*w)
                 list_of_data.append(data_noisy)
-                try:
-                    popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess, bounds=(lower_bound, upper_bound), maxfev=50000)
-                except RuntimeError:
-                    print('[INFO] RuntimeError, reset initial guess')
-                    #plt.imshow(np.reshape(data_noisy,[32,32]))
-                    #plt.show()
-                    popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess_2, bounds = (lower_bound, upper_bound), maxfev=50000)
-                popt_list.append(popt)
-                # update initial_guess intelligently
-                if (j % 100) == 0:
-                    initial_guess = np.mean(popt_list, axis=0)
-                    print('[INFO] {}/{} gaussian fits done'.format(j, b))
-                # initial_guess = popt
-                # decide whether the metric is supposed to be the maximum or the intermediate
-                dict_of_metric[ti].append(np.sqrt(popt[3]**2 + popt[4]**2))
-                #dict_of_metric[ti].append(max(popt[3], popt[4]))
-            for popt in popt_list:
-                list_of_fitted_data.append(twoD_Gaussian((x, y), *popt))
-            popt_list = []
+                # *** fitting gaussians
+            #     try:
+            #         popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess, bounds=(lower_bound, upper_bound), maxfev=50000)
+            #     except RuntimeError:
+            #         print('[INFO] RuntimeError, reset initial guess')
+            #         #plt.imshow(np.reshape(data_noisy,[32,32]))
+            #         #plt.show()
+            #         popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess_2, bounds = (lower_bound, upper_bound), maxfev=50000)
+            #     popt_list.append(popt)
+            #     # update initial_guess intelligently
+            #     if (j % 100) == 0:
+            #         initial_guess = np.mean(popt_list, axis=0)
+            #         print('[INFO] {}/{} gaussian fits done'.format(j, b))
+            #     # initial_guess = popt
+            #     # decide whether the metric is supposed to be the maximum or the intermediate
+            #     dict_of_metric[ti].append(np.sqrt(popt[3]**2 + popt[4]**2))
+            #     #dict_of_metric[ti].append(max(popt[3], popt[4]))
+            # for popt in popt_list:
+            #     list_of_fitted_data.append(twoD_Gaussian((x, y), *popt))
+            # popt_list = []
+            # ***
             im = ax[row,ti].imshow(np.mean(list_of_data,0).reshape(32, 32), cmap="rocket", origin='upper', vmin=min, vmax=max, extent=(x.min(), x.max(), y.min(), y.max()))
-            ax[row,ti].contour(x, np.flip(y), np.mean(list_of_fitted_data,0).reshape(32, 32), levels=[.35,.4,.45,.5], colors='w',linewidths=.25, linestyles='dashed')
+            #ax[row,ti].contour(x, np.flip(y), np.mean(list_of_fitted_data,0).reshape(32, 32), levels=[.35,.4,.45,.5], colors='w',linewidths=.25, linestyles='dashed')
             
-            # popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.mean(list_of_data,0), p0=initial_guess, bounds=(lower_bound, upper_bound), maxfev=50000)
-            # ax[row,ti].contour(x, np.flip(y), (twoD_Gaussian((x, y), *popt)).reshape(32, 32), levels=[.35,.4,.45,.5], colors='w',linewidths=.25)
+            popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), np.mean(list_of_data,0), p0=initial_guess, bounds=(lower_bound, upper_bound), maxfev=50000)
+            ax[row,ti].contour(x, np.flip(y), (twoD_Gaussian((x, y), *popt)).reshape(32, 32), levels=[.35,.4,.45,.5], colors='w',linewidths=.25)
 
             #ax[row,ti].axis('off')
             ax[row,ti].set_yticks([])
@@ -1494,7 +1536,7 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
             ax[2,ti].plot(16, 16, marker="+", color='black', markersize=5.0, markeredgewidth=.25)
             
             #ax[row,ti].set_xlabel('g={:0.3f}'.format(np.mean(ginis)))
-            print('[INFO] row: {} ti: {} - gini coefficient mean: {:0.3f}, std: {:0.3f}'.format(row, ti, np.mean(ginis), np.std(ginis)))
+            print('[INFO] row: {} ti: {} - gini coefficient mean: {:0.3f}, std: {:0.3f}'.format(row, ti, np.mean(ginis, axis=0)[ti], np.std(ginis, axis=0)[ti]))
         
         # T-Test mit Bonferroni Korrektur nach Benjamini Hochberg
         qstar = 0.05
@@ -1532,24 +1574,44 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
         box = ax[row,-2].get_position()
         ax[row,-2].set_position([box.x0, box.y0 - 0.014, box.width * 1.12, box.height * 1.12])
         
-        
-        # Shrink current axis by 50%
-        box = ax[row,-1].get_position()
-        ax[row,-1].set_position([box.x0 + 0.1, box.y0 + 0.02, box.width * 0.5, box.height * 0.5])
-
-    
-        #ax = plt.axes([0.75, 0.5, .10, .10])
         ax[row,-1].set_zorder(-1)
-        ax[row,-1].matshow(significance_table, cmap='Greys')
+        
+        
+        # Shrink current axis by some amount%
+        box = ax[row,-1].get_position()
+        ax[row,-1].set_position([box.x0 + 0.125, box.y0 + 0.02, box.width * 0.85, box.height * 0.85])
 
-        ax[row,-1].set_xticklabels(['','$t_0$','$t_1$','$t_2$'], fontsize=10)#fontsize=65)
-        ax[row,-1].tick_params(labelbottom=True, labeltop=False,
-                      right=False, top=False)
-        ax[row,-1].set_yticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=10)#fontsize=65)
-        ax[row,-1].set_xlim([-0.5, t - 1 - 0.5])
-        ax[row,-1].set_ylim([t - 0.5, -0.5 + 1])
+        
+        ax[row,-1].errorbar(np.arange(t), ginis.mean(axis=0), yerr=ginis.std(axis=0), xerr=None, fmt='o-', color='black')
+        #ax[-1,-1].set_xlabel("timesteps")
+        #ax[row,-1].set_ylabel("$g_c$")
+        ax[0,-1].set_title("$g_c$")
         ax[row,-1].spines['top'].set_visible(False)
         ax[row,-1].spines['right'].set_visible(False)
+        ax[row, -1].tick_params(axis='y', right=False, left=True, labelleft=True, labelright=False)
+        ax[row, -1].set_xticks(np.arange(t))
+        ax[row, -1].set_yticks([0, 0.1, 0.2, 0.3])
+        ax[row, -1].set_ylim([0.,0.3])
+        ax[row, -1].set_xlim([-0.25,3.25])
+        ax[row, -1].set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'])
+        
+        # significance table (deprecated)
+        # 
+        # # Shrink current axis by 50%
+        # box = ax[row,-1].get_position()
+        # ax[row,-1].set_position([box.x0 + 0.1, box.y0 + 0.02, box.width * 0.5, box.height * 0.5])
+
+        # #ax = plt.axes([0.75, 0.5, .10, .10])
+        # ax[row,-1].set_zorder(-1)
+        # ax[row,-1].matshow(significance_table, cmap='Greys')
+        # ax[row,-1].set_xticklabels(['','$t_0$','$t_1$','$t_2$'], fontsize=10)#fontsize=65)
+        # ax[row,-1].tick_params(labelbottom=True, labeltop=False,
+        #               right=False, top=False)
+        # ax[row,-1].set_yticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=10)#fontsize=65)
+        # ax[row,-1].set_xlim([-0.5, t - 1 - 0.5])
+        # ax[row,-1].set_ylim([t - 0.5, -0.5 + 1])
+        # ax[row,-1].spines['top'].set_visible(False)
+        # ax[row,-1].spines['right'].set_visible(False)
     
     #ax[-1,-1].add_patch(patches.Rectangle((0.0 - 1.5, 2.5+2.5), 1, 1, fill='black',
     #   color='black', alpha=1, clip_on=False))
@@ -1573,7 +1635,7 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
     # Add the patch to the Axes
     #ax[0,0].add_patch(rect)
     # Annotate
-    ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-24,+12]), weight='bold', fontsize=24)
+    ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-10,+12]), weight='bold', fontsize=24)
     
     plt.savefig(filename, dpi=300, format='pdf')
     plt.close()
@@ -2338,7 +2400,7 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     # calculate the distances for the two occluder-centroids to the representation
     # of the occluded digits
     
-    sim = distancemetrics.Similarity(minimum=0.001)
+    sim = metrics.Similarity(minimum=0.001)
     
     distances = np.zeros([points,time,n_targets])
     relative_distances = np.zeros([points,time,n_targets-1])
