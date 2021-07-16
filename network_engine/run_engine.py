@@ -201,7 +201,7 @@ class ExperimentEnvironment(object):
 
     def update_parameters(self):
         self.parameters['output_dir'] = [self.data_dir]
-        self.parameters['visualization_dir'] = [self.visualization_dir_dir]
+        self.parameters['visualization_dir'] = [self.visualization_dir]
         return self.parameters
 
     def est_folder_structure(self):
