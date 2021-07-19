@@ -63,7 +63,6 @@ import matplotlib.pyplot as plt
 # custom functions
 # -----
 import utilities.visualizer as visualizer
-import utilities.distancemetrics as distancemetrics
 from utilities.networks.buildingblocks.rcnn import RecConvNet, CAM
 from utilities.dataset_handler import StereoImageFolderLMDB, StereoImageFolder, AffineTransform
 
@@ -296,8 +295,8 @@ def fig_cam(network, test_transform, configuration_dict, sample_size, random_see
 	#     )    
 	
 
-	visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/fig8a_cam_samples.pdf'.format(configuration_dict['visualization_dir']))
-	visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/fig8a_cam_samples_alt.pdf'.format(configuration_dict['visualization_dir']))
+	#visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/fig8a_cam_samples.pdf'.format(configuration_dict['visualization_dir']))
+	#visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[948,614,541], filename='{}/fig8a_cam_samples_alt.pdf'.format(configuration_dict['visualization_dir']))
 	# np.random.choice(np.arange(1000),10)
 	# visualizer.plot_cam_samples(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741, 309, 289])
 	# visualizer.plot_cam_samples_alt(cams, img, tar, topk_prob, topk_pred, list_of_indices=[972, 51, 205, 227, 879, 538, 112, 741])
