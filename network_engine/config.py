@@ -21,19 +21,15 @@
 # _____________________________________________________________________________
 #
 #
-# Copyright 2020 Markus Ernst
+# Copyright 2021 Markus Ernst
 #
-# Licensed under the Apache License, Version 2.0 (the "License");
-# you may not use this file except in compliance with the License.
-# You may obtain a copy of the License at
-#
-#     http://www.apache.org/licenses/LICENSE-2.0
-#
-# Unless required by applicable law or agreed to in writing, software
-# distributed under the License is distributed on an "AS IS" BASIS,
-# WITHOUT WARRANTIES OR CONDITIONS OF ANY KIND, either express or implied.
-# See the License for the specific language governing permissions and
-# limitations under the License.
+# THE SOFTWARE IS PROVIDED “AS IS”, WITHOUT WARRANTY OF ANY KIND, EXPRESS 
+# OR IMPLIED, INCLUDING BUT NOT LIMITED TO THE WARRANTIES OF MERCHANTABILITY, 
+# FITNESS FOR A PARTICULAR PURPOSE AND NONINFRINGEMENT. IN NO EVENT SHALL THE 
+# AUTHORS OR COPYRIGHT HOLDERS BE LIABLE FOR ANY CLAIM, DAMAGES OR OTHER 
+# LIABILITY, WHETHER IN AN ACTION OF CONTRACT, TORT OR OTHERWISE, ARISING FROM,
+# OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR OTHER DEALINGS IN 
+# THE SOFTWARE.
 #
 # _____________________________________________________________________________
 
@@ -69,7 +65,7 @@ def get_par():
 
     par = {}
 
-    par['exp_name'] = ["new_experiment"]
+    par['exp_name'] = ["noname_experiment"]
     # par['name'] must be defined as a FLAG to engine, b/c it resembles the
     # iteration number that gets passed by the sbatch script
     # TODO: add documentation i.e. parameter possibilities
@@ -99,7 +95,7 @@ def get_par():
 
     par['batchsize'] = [500] #500
     par['epochs'] = [100]
-    par['learning_rate'] = [0.001]
+    par['learning_rate'] = [0.004]
 
     return par
 
@@ -118,7 +114,7 @@ def get_aux():
     aux = {}
     aux['wdir'] = ["{}titan/".format(PWD_STEM)]
     aux['input_dir'] = ["{}titan/datasets/".format(PWD_STEM)]
-    aux['input_dir'] = ["/home/aecgroup/aecdata/Textures/occluded/datasets/"]
+    # aux['input_dir'] = ["/home/aecgroup/aecdata/Textures/occluded/datasets/"]
     aux['output_dir'] = ["{}titan/experiments/".format(PWD_STEM)]
     # aux['output_dir'] = ["/home/aecgroup/aecdata/Results_python/markus/experiments/"]
     aux['norm_by_stat'] = [False]
@@ -129,17 +125,18 @@ def get_aux():
 
     aux['lr_decay'] = [True]
     aux['lr_cosine'] = [False]
-    aux['lr_decay_epochs'] = ['60, 75, 90']
+    aux['lr_decay_epochs'] = ['90,'] # ['60, 75, 90'] # ['90,']
     aux['lr_decay_rate'] = [0.1]
     aux['l2_lambda'] = [0.] # 0.0005
     # old parameters for Spoerer Like decay
-    aux['lr_eta'] = [0.1]
-    aux['lr_delta'] = [0.1]
-    aux['lr_d'] = [40.]
+    # aux['lr_eta'] = [0.1]
+    # aux['lr_delta'] = [0.1]
+    # aux['lr_d'] = [40.]
     aux['global_weight_init_mean'] = ['None'] #[1.0, 0.0]
     aux['global_weight_init_std'] = ['None']
     # Info: None-Values have to be strings b/c of csv text conversion
-
+    
+    #aux['num_workers'] = [4]
     aux['iterations'] = [1] # 5
     return aux
 
