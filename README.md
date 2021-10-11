@@ -34,6 +34,7 @@ If you make use of this code please cite as follows:
 │   ├── cifar10                      # CIFAR10
 │   ├── cifar100                     # CIFAR100
 │   ├── mnist                        # MNIST
+│   ├── dynaMO                       # Dynamic Occluded MNIST (experimental)
 │   ├── osfashionmnist2c             # OS-fashion-MNIST
 │   ├── osmnist2c                    # OS-MNIST
 │   ├── osfashionmnist2r             # OS-fashion-MNIST
