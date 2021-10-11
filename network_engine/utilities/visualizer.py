@@ -541,6 +541,14 @@ def plot_concentration_mass(target_percentage, occluder_percentage, overlap_perc
     plt.savefig(filename)
     plt.close()
     
+    print('[INFO] background percentage')
+    print(background_percentage.mean(axis=0), background_percentage.std(axis=0))
+    print('[INFO] occluder percentage')
+    print(occluder_percentage.mean(axis=0), occluder_percentage.std(axis=0))
+    print('[INFO] overlap percentage')
+    print(overlap_percentage.mean(axis=0), overlap_percentage.std(axis=0))
+    print('[INFO] target percentage')
+    print(target_percentage.mean(axis=0), target_percentage.std(axis=0))
     # reform into a pandas dataframe
     points, _ = target_percentage.shape
     
@@ -548,9 +556,9 @@ def plot_concentration_mass(target_percentage, occluder_percentage, overlap_perc
         np.hstack([
         
         np.vstack([background_percentage[:,0], np.repeat(0, points), np.repeat('background', points)]),
-        np.vstack([background_percentage[:,0], np.repeat(1, points), np.repeat('background', points)]),
-        np.vstack([background_percentage[:,0], np.repeat(2, points), np.repeat('background', points)]),
-        np.vstack([background_percentage[:,0], np.repeat(3, points), np.repeat('background', points)])
+        np.vstack([background_percentage[:,1], np.repeat(1, points), np.repeat('background', points)]),
+        np.vstack([background_percentage[:,2], np.repeat(2, points), np.repeat('background', points)]),
+        np.vstack([background_percentage[:,3], np.repeat(3, points), np.repeat('background', points)])
         ,
         np.vstack([occluder_percentage[:,0], np.repeat(0, points), np.repeat('occluder', points)]),
         np.vstack([occluder_percentage[:,1], np.repeat(1, points), np.repeat('occluder', points)]),
@@ -573,7 +581,11 @@ def plot_concentration_mass(target_percentage, occluder_percentage, overlap_perc
     concentration_df['timestep'] = concentration_df['timestep'].astype('int')
     with sns.axes_style("ticks"):
         sns.set_context("paper", font_scale=1.0, )#rc={"lines.linewidth": 0.5})
-        fig, ax = plt.subplots(figsize=(4,4))
+        fig, ax = plt.subplots(figsize=(4,5.25), gridspec_kw=dict(wspace=0.0, hspace=0.0,
+             top=0.95,
+             bottom=0.07,
+             left=0.20,
+             right=0.90))
         palette = sns.color_palette("colorblind")
         palette = [sns.color_palette("colorblind")[7]] + sns.color_palette("colorblind")
         sns.set_palette(palette)
@@ -581,9 +593,11 @@ def plot_concentration_mass(target_percentage, occluder_percentage, overlap_perc
         hue='type', showfliers = False, ax=ax
         )
         sns.despine(offset=10, trim=True)
-        ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=12)
+        ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'])
         ax.set_ylabel('Percentage')
         ax.set_xlabel('Time step')
+        #ax.set_ylim([0.05, 0.5])
+        ax.legend(title="pixel type", loc="upper left", bbox_to_anchor=(0,1), ncol=1, fontsize=10, title_fontsize=10, framealpha=0.0, facecolor='white', edgecolor='white')
         # from statannot import add_stat_annotation
         # add_stat_annotation(ax, data=concentration_df, x='timestep', y='data', hue='type',
         #     box_pairs=[
@@ -597,6 +611,44 @@ def plot_concentration_mass(target_percentage, occluder_percentage, overlap_perc
         #     ], test='t-test_ind', text_format='star', loc='inside', verbose=2)
         
         plt.show()
+        
+        # T-Test/KS-Test mit Bonferroni Korrektur nach Benjamini Hochberg
+        #print(concentration_df, concentration_df.shape)
+        pixel_types = ['background', 'occluder', 'overlap', 'target']
+        
+        t = 4
+        for ti in range(t):
+            df = concentration_df[concentration_df.timestep == ti]
+            qstar = 0.05
+            pval = np.ones([t, t])
+            stval = np.ones([t, t])
+            significance_table = np.zeros([t, t])
+            for k in range(t):
+                for j in range(t):
+                    if k != j and k > j:
+                        #stval[k, j], pval[k, j] = st.ttest_ind(dict_of_metric[k], dict_of_metric[j], equal_var=False)
+                        stval[k, j], pval[k, j] = st.ks_2samp(
+                            df[df.type == pixel_types[k]].data.values,
+                            df[df.type == pixel_types[j]].data.values,
+                            alternative='two-sided',
+                            mode='auto')
+    
+            print(np.round(pval, 4))
+            print(np.round(stval, 4))
+    
+            sorted_pvals = np.sort(pval[pval < 1])
+            bjq = np.arange(1, len(sorted_pvals) + 1) / \
+                len(sorted_pvals) * qstar
+    
+            for k in range(t):
+                for j in range(t):
+                    if k != j and k > j:
+                        if pval[k, j] in sorted_pvals[sorted_pvals - bjq <= 0]:
+                            significance_table[k, j] = 1
+                        else:
+                            significance_table[k, j] = 0
+            
+            print(significance_table)
     
 
 # -----------------
@@ -1117,7 +1169,7 @@ def plot_cam_samples_alt(cams, pics, targets, probs, preds, filename, list_of_in
     else:
         grid_dict = dict(left=0.05,right=0.875, bottom=0.12)
 
-    fig, ax = plt.subplots(n_rows,t, gridspec_kw=grid_dict, figsize=(6.4 - 0.5, 5.2/3.0*n_rows))
+    fig, ax = plt.subplots(n_rows,t, gridspec_kw=grid_dict)#, figsize=(6.4 - 0.5, 5.2/3.0*n_rows))
     
     for row,ind in enumerate(list_of_indices):
         current_image = pics[ind,0,0,:,:]
@@ -1483,6 +1535,8 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
                 initial_guess_2 = (3.,x_init[0],y_init[0],5,5,0.,10.)
                 data_noisy = np.reshape(data_noisy,h*w)
                 list_of_data.append(data_noisy)
+                
+                dict_of_metric[ti].append(metrics.gini(data_noisy))
                 # *** fitting gaussians
             #     try:
             #         popt, pcov = opt.curve_fit(twoD_Gaussian, (x, y), data_noisy, p0=initial_guess, bounds=(lower_bound, upper_bound), maxfev=50000)
@@ -1504,6 +1558,7 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
             #     list_of_fitted_data.append(twoD_Gaussian((x, y), *popt))
             # popt_list = []
             # ***
+            
             im = ax[row,ti].imshow(np.mean(list_of_data,0).reshape(32, 32), cmap="rocket", origin='upper', vmin=min, vmax=max, extent=(x.min(), x.max(), y.min(), y.max()))
             #ax[row,ti].contour(x, np.flip(y), np.mean(list_of_fitted_data,0).reshape(32, 32), levels=[.35,.4,.45,.5], colors='w',linewidths=.25, linestyles='dashed')
             
@@ -1535,10 +1590,8 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
             ax[2,0].set_ylabel('center', fontsize=12)
             ax[2,ti].plot(16, 16, marker="+", color='black', markersize=5.0, markeredgewidth=.25)
             
-            #ax[row,ti].set_xlabel('g={:0.3f}'.format(np.mean(ginis)))
-            print('[INFO] row: {} ti: {} - gini coefficient mean: {:0.3f}, std: {:0.3f}'.format(row, ti, np.mean(ginis, axis=0)[ti], np.std(ginis, axis=0)[ti]))
         
-        # T-Test mit Bonferroni Korrektur nach Benjamini Hochberg
+        # T-Test/KS-Test mit Bonferroni Korrektur nach Benjamini Hochberg
         qstar = 0.05
         pval = np.ones([t, t])
         stval = np.ones([t, t])
@@ -1546,7 +1599,8 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
         for k in range(t):
             for j in range(t):
                 if k != j and k > j:
-                    stval[k, j], pval[k, j] = st.ttest_ind(dict_of_metric[k], dict_of_metric[j], equal_var=False)
+                    #stval[k, j], pval[k, j] = st.ttest_ind(dict_of_metric[k], dict_of_metric[j], equal_var=False)
+                    stval[k, j], pval[k, j] = st.ks_2samp(dict_of_metric[k], dict_of_metric[j], alternative='two-sided', mode='auto')
 
         print(np.round(pval, 4))
         print(np.round(stval, 4))
@@ -1580,7 +1634,10 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
         # Shrink current axis by some amount%
         box = ax[row,-1].get_position()
         ax[row,-1].set_position([box.x0 + 0.125, box.y0 + 0.02, box.width * 0.85, box.height * 0.85])
-
+        
+        
+        print('[INFO] gini, row:{}'.format(row))
+        print(ginis.mean(axis=0), ginis.std(axis=0))
         
         ax[row,-1].errorbar(np.arange(t), ginis.mean(axis=0), yerr=ginis.std(axis=0), xerr=None, fmt='o-', color='black')
         #ax[-1,-1].set_xlabel("timesteps")
@@ -1635,11 +1692,12 @@ def plot_cam_means2(cams_list, targets, probs, preds, filename):
     # Add the patch to the Axes
     #ax[0,0].add_patch(rect)
     # Annotate
-    ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-10,+12]), weight='bold', fontsize=24)
+    ax[0,0].annotate('B', xy=(ax_in.get_xlim()[0],ax_in.get_ylim()[1]), xytext=np.array([ax_in.get_xlim()[0],ax_in.get_ylim()[1]])+np.array([-10,+10]), weight='bold', fontsize=24)
     
     plt.savefig(filename, dpi=300, format='pdf')
     plt.close()
-
+    
+    return ginis
 # -----------------
 # tsne and softmax output functions
 # -----------------
@@ -2408,11 +2466,11 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
 
     for ti in range(time):
         for i,(a,b,c) in enumerate(nhot_targets):
-            distances[i,ti,0] = sim.fractional_distance(
+            distances[i,ti,0] = sim.euclidean_distance(
                 representations[i,ti], centroid_unocc[a,ti])
-            distances[i,ti,1] = sim.fractional_distance(
+            distances[i,ti,1] = sim.euclidean_distance(
                 representations[i,ti], centroid_unocc[b,ti])
-            distances[i,ti,2] = sim.fractional_distance(
+            distances[i,ti,2] = sim.euclidean_distance(
                 representations[i,ti], centroid_unocc[c,ti])
     
     # calculate relative distances relative_distance = d_zur_8 / 0.5(d_zur_8 + d_zur_2)
@@ -2467,6 +2525,11 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     plt.show()
     
     
+    print('[INFO] distance 1')
+    print(relative_distances.mean(axis=0)[:,0], relative_distances.std(axis=0)[:,0])
+    print('[INFO] distance 2')
+    print(relative_distances.mean(axis=0)[:,1], relative_distances.std(axis=0)[:,1])
+    
     fig, ax = plt.subplots(figsize=(4.5, 3.4),
                            gridspec_kw=dict(bottom=0.15, left=0.15))
     reldist_df = pd.DataFrame(
@@ -2482,27 +2545,48 @@ def plot_relative_distances(representations, nhot_targets, representations_unocc
     np.vstack([relative_distances[:,3,1], np.repeat(3, points), np.repeat(2, points)])
     
     ]).T, columns=['data', 'timestep', 'occluder'])
-    sns.violinplot(data=reldist_df, y='data', x='timestep', palette='Greys', hue='occluder', split=True, ax=ax)
-    ax.axhline(y=relative_distances[:,0,0].mean(), xmin=0, xmax=5, color='black', linestyle='--')
-    #ax.axhline(y=0), xmin=0, xmax=5, color='black', linestyle='--')
-    #ax.set_title('Relative distance - unoccluded target, unoccluded occluder')
-    ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'], fontsize=12)
-    ax.set_ylabel('Relative distance')
-    ax.set_xlabel('Time step')
-    ax.legend(ax.get_legend_handles_labels()[0],['$d_{rel,1}$', '$d_{rel,2}$'],frameon=True, facecolor='white', edgecolor='white', framealpha=0.0, loc='upper right')
-    # from statannot import add_stat_annotation
-    # add_stat_annotation(ax, data=reldist_df, x='timestep', y='data', hue='occluder',
-    #     box_pairs=[
-    #         # ((0,1),(1,1)),
-    #         # ((1,1),(2,1)),
-    #         # ((0,2),(1,2)),
-    #         # ((1,2),(2,2)),
-    #         ((2,1),(3,1)),
-    #         ((2,2),(3,2)),
-    #     ], test='Kolmogorov-Smirnov-ls', text_format='star', loc='inside', verbose=2)
-    ax.annotate('B', xy=(ax.get_xlim()[0],ax.get_ylim()[1]), xytext=np.array([ax.get_xlim()[0],ax.get_ylim()[1]])+np.array([-0.75,0.25]), weight='bold', fontsize=16)
     
-    plt.savefig(filename, dpi=300, format='pdf')
+    with sns.axes_style("ticks"):
+        sns.set_context("paper", font_scale=1.0, )#rc={"lines.linewidth": 0.5})
+        fig, ax = plt.subplots(figsize=(4,3), gridspec_kw=dict(wspace=0.0, hspace=0.0,
+             top=0.90,
+             bottom=0.20,
+             left=0.20,
+             right=0.90))
+    
+        
+        
+        sns.violinplot(data=reldist_df, y='data', x='timestep', palette='Greys', hue='occluder', split=True, ax=ax)
+        ax.axhline(y=relative_distances[:,0,0].mean(), xmin=0, xmax=5, color='black', linestyle='--')
+        #ax.axhline(y=0), xmin=0, xmax=5, color='black', linestyle='--')
+        #ax.set_title('Relative distance - unoccluded target, unoccluded occluder')
+        ax.set_xticklabels(['$t_0$','$t_1$','$t_2$','$t_3$'])
+        ax.set_ylabel('Relative distance')
+        ax.set_xlabel('Time step')
+        ax.set_ylim(0,2.75) # 3.5 for fractional metric
+        sns.despine(offset=10, trim=True)
+        
+        ax.legend(ax.get_legend_handles_labels()[0],['$d_{rel,1}$', '$d_{rel,2}$'],frameon=True, facecolor='white', edgecolor='white', framealpha=0.0, loc='upper right')
+#         from statannot import add_stat_annotation
+#         add_stat_annotation(ax, data=reldist_df, x='timestep', y='data', hue='occluder',
+#             box_pairs=[
+#                 ((0,1),(1,1)),
+#                 ((1,1),(2,1)),
+#                 ((2,1),(3,1)),
+#                 ((0,2),(1,2)),
+#                 ((1,2),(2,2)),
+#                 ((2,2),(3,2)),     
+#                 ((0,1),(2,1)),
+#                 ((0,1),(3,1)),
+#                 ((1,1),(3,1)),
+#                 ((0,2),(2,2)),
+#                 ((0,2),(3,2)),
+#                 ((1,2),(3,2)),
+# 
+#             ], test='Kolmogorov-Smirnov-ls', text_format='star', loc='inside', verbose=2)
+        ax.annotate('B', xy=(ax.get_xlim()[0],ax.get_ylim()[1]), xytext=np.array([ax.get_xlim()[0],ax.get_ylim()[1]])+np.array([-0.95,0.25]), weight='bold', fontsize=15)
+        
+        plt.savefig('{}.pdf'.format(filename), dpi=300, format='pdf')
     
     pass
 
