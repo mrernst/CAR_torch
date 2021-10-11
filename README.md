@@ -8,7 +8,7 @@ CAR_torch stands for Convolutional Architectures with Recurrence, pytorch implem
 If you make use of this code please cite as follows:
  
 
-[1] **Ernst, M. R., Burwick, T., & Triesch, J. (2021). Recurrent Processing Improves Occluded Object Recognition and Gives Rise to Perceptual Hysteresis. In Journal of Vision **
+[1] **Ernst, M. R., Burwick, T., & Triesch, J. (2021). Recurrent Processing Improves Occluded Object Recognition and Gives Rise to Perceptual Hysteresis. In Journal of Vision**
 
 
 ## Getting started with the repository
