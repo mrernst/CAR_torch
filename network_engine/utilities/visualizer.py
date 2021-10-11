@@ -7,8 +7,8 @@
 # June 2020                                     _.u[[/;:,.         .odMMMMMM'
 #                                             .o888UU[[[/;:-.  .o@P^    MMM^
 # visualizer.py                              oN88888UU[[[/;::-.        dP^
-# Description Description                   dNMMNN888UU[[[/;:--.   .o@P^
-# Description Description                  ,MMMMMMN888UU[[/;::-. o@^
+# visualization functions                   dNMMNN888UU[[[/;:--.   .o@P^
+#                                          ,MMMMMMN888UU[[/;::-. o@^
 #                                          NNMMMNN888UU[[[/~.o@P^
 # Markus Ernst                             888888888UU[[[/o@^-..
 #                                         oI8888UU[[[/o@P^:--..

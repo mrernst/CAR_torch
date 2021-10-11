@@ -6,9 +6,9 @@
 #                                                                         _.oo.
 # April 2020     	                              _.u[[/;:,.         .odMMMMMM'
 #                                             .o888UU[[[/;:-.  .o@P^    MMM^
-# dataset_handler.p                          oN88888UU[[[/;::-.        dP^
-# Description Description                   dNMMNN888UU[[[/;:--.   .o@P^
-# Description Description                  ,MMMMMMN888UU[[/;::-. o@^
+# dataset_handler.py                         oN88888UU[[[/;::-.        dP^
+# Pytorch dataloaders	                    dNMMNN888UU[[[/;:--.   .o@P^
+# 						                   ,MMMMMMN888UU[[/;::-. o@^
 #                                          NNMMMNN888UU[[[/~.o@P^
 # Markus Ernst                             888888888UU[[[/o@^-..
 #                                         oI8888UU[[[/o@P^:--..
@@ -330,6 +330,7 @@ class ImageFolderLMDB(Dataset):
 class StereoImageFolderLMDB(Dataset):
 	def __init__(self, db_path, stereo=False, transform=None, target_transform=None):
 		self.db_path = db_path
+		#********
 		self.env = lmdb.open(db_path, subdir=os.path.isdir(db_path),
 							 readonly=True, lock=False,
 							 readahead=False, meminit=False)
@@ -337,7 +338,8 @@ class StereoImageFolderLMDB(Dataset):
 			# self.length = txn.stat()['entries'] - 1
 			self.length =pa.deserialize(txn.get(b'__len__'))
 			self.keys= pa.deserialize(txn.get(b'__keys__'))
-	
+		#********
+		
 		self.stereo = stereo
 		self.transform = transform
 		self.target_transform = target_transform
@@ -345,12 +347,26 @@ class StereoImageFolderLMDB(Dataset):
 	def __len__(self):
 		return self.length
 	
+	def _open_lmdb(self):
+		self.env = lmdb.open(self.db_path, subdir=os.path.isdir(self.db_path),
+							  readonly=True, lock=False,
+							  readahead=False, meminit=False)
+		with self.env.begin(write=False) as txn:
+			# self.length = txn.stat()['entries'] - 1
+			self.length = pa.deserialize(txn.get(b'__len__'))
+			self.keys = pa.deserialize(txn.get(b'__keys__'))
+			self.txn = txn
+	
 	def __getitem__(self, index):
-		img_l, img_r, target = None, None, None
+		if not hasattr(self, 'env'):
+			self._open_lmdb()
 		
-		env = self.env
-		with env.begin(write=False) as txn:
-			byteflow = txn.get(self.keys[index])
+		img_l, img_r, target = None, None, None
+		#env = self.env
+		#with self.env.begin(write=False) as txn:
+			# byteflow = txn.get(self.keys[index])
+		byteflow = self.txn.get(self.keys[index])
+
 		unpacked = pa.deserialize(byteflow)
 
 		# load image
