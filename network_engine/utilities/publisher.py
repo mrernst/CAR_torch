@@ -60,6 +60,14 @@ import sys
 from PIL import Image, ImageOps
 import matplotlib.pyplot as plt
 
+# statsmodels for ANOVA
+import pandas as pd
+import statsmodels.api as sm
+from statsmodels.formula.api import ols
+from statsmodels.stats.anova import AnovaRM
+
+from scipy.stats import shapiro, levene, ks_2samp, ttest_ind
+
 # custom functions
 # -----
 import utilities.visualizer as visualizer
@@ -71,6 +79,18 @@ device = torch.device("cuda" if torch.cuda.is_available() else "cpu")
 # ----------------
 # Helper Functions
 # ----------------
+
+
+def eta_squared(aov):
+	aov['eta_sq'] = 'NaN'
+	aov['eta_sq'] = aov[:-1]['sum_sq']/sum(aov['sum_sq'])
+	return aov
+def omega_squared(aov):
+	mse = aov['sum_sq'][-1]/aov['df'][-1]
+	aov['omega_sq'] = 'NaN'
+	aov['omega_sq'] = (aov[:-1]['sum_sq']-(aov[:-1]['df']*mse))/(sum(aov['sum_sq'])+mse)
+	return aov
+	
 
 def show(img):
 	npimg = img.numpy()
@@ -256,7 +276,7 @@ def compare_concentration_mass(rgb_loader, test_loader, network, timesteps, ster
 		background_pixel_percentages = np.concatenate(background_pixel_percentages, axis=0)
 		overlap_percentages = np.concatenate(overlap_percentages, axis=0)
 		overlap_pixel_percentages = np.concatenate(overlap_pixel_percentages, axis=0)
-
+		
 		
 		return target_percentages, target_pixel_percentages, occluder_percentages, occluder_pixel_percentages, overlap_percentages, overlap_pixel_percentages, background_percentages, background_pixel_percentages
 	
@@ -329,7 +349,65 @@ def fig_cam(network, test_transform, configuration_dict, sample_size, random_see
 		prob3.append(topk_prob)
 		pred3.append(topk_pred)
 	
-	visualizer.plot_cam_means2(c3, t3, prob3, pred3, filename='{}/fig8b_cam_means.pdf'.format(configuration_dict['visualization_dir']))
+	gini_coefficients = visualizer.plot_cam_means2(c3, t3, prob3, pred3, filename='{}/fig8b_cam_means.pdf'.format(configuration_dict['visualization_dir']))
+	
+	# ANOVA of gini-coefficients
+	
+	dataframe = pd.DataFrame({'id':np.arange(gini_coefficients.shape[0]), 't0':gini_coefficients[:,0], 't1':gini_coefficients[:,1], 't2':gini_coefficients[:,2], 't3':gini_coefficients[:,3]})
+	
+	melted_df = pd.melt(dataframe, id_vars=['id'])
+	melted_df.rename(columns = {'variable':'timesteps'}, inplace=True)
+	melted_df['condition'] = np.repeat('background', melted_df.shape[0])
+	
+	
+	# # normality assumption
+	# for i in range(gini_coefficients.shape[1]):
+	# 	stat, p = shapiro(gini_coefficients[:,i])
+	# 	print('Wilk-Shapiro: t{}: statistics={}, p={}'.format(i, stat, p))
+	# 	# interpret
+	# 	alpha = 0.05
+	# 	if p > alpha:
+	# 		print('Sample looks Gaussian (fail to reject H0)')
+	# 	else:
+	# 		print('Sample does not look Gaussian (reject H0)')
+	# 
+	# # homogeneity of variance assumption
+	# stat, p = levene(gini_coefficients[:,0], gini_coefficients[:,1], gini_coefficients[:,2],gini_coefficients[:,3], center='median')
+	# print('Levene: statistics={}, p={}'.format(stat, p))
+	# stat, p = levene(gini_coefficients[:,0], gini_coefficients[:,1], gini_coefficients[:,2],gini_coefficients[:,3], center='mean')
+	# print('Levene: statistics={}, p={}'.format(stat, p))
+# 
+	# if p > alpha:
+	# 	print('Groups have equal variance (fail to reject H0)')
+	# else:
+	# 	print('Groups do not have equal variance (reject H0)')
+	# # standard ANOVA
+	# print('[INFO] Standard one-way ANOVA')
+	# melted_df.boxplot('value', by='timesteps')
+	# plt.show()
+	# 
+	# linear_model= ols('value ~ timesteps', data=melted_df).fit()
+	# #print(linear_model.summary())
+	# aov_table = sm.stats.anova_lm(linear_model, typ=2)
+	# eta_squared(aov_table)
+	# omega_squared(aov_table)
+	# print(aov_table.round(4))
+	# 
+	# from statsmodels.stats.oneway import anova_oneway
+	# 
+	# print('[INFO] Repeated Measures one-way ANOVA')
+	# aovrm = AnovaRM(melted_df, 'value', 'id', within=['timesteps'])
+	# res = aovrm.fit()
+	# print(res)
+	# 
+	# (F(3,2997)=890.7, p=0.000)
+	
+	# posthoc
+	# tukey HSD or multiple t-tests with bonferroni-correction
+	
+	pass
+	
+
 
 
 def fig_softmax_and_tsne(network, test_transform, configuration_dict, sample_size, random_seed):
@@ -485,8 +563,9 @@ def fig_concentration(network, test_transform, configuration_dict, sample_size, 
 	
 	tp, tpp, op, opp, ovlp, ovlpp, bp, bpp = compare_concentration_mass(rgb_loader, cos_loader, network, configuration_dict['time_depth'] + 1, configuration_dict['stereo'])
 	
+	
 	visualizer.plot_concentration_mass(tp, op, ovlp, bp, filename='{}/fig8c_percentage.pdf'.format(configuration_dict['visualization_dir']))
-	visualizer.plot_concentration_mass(tpp, opp, ovlpp, bpp, filename='{}/fig8c_pixelpercentage.pdf'.format(configuration_dict['visualization_dir']))        
+	visualizer.plot_concentration_mass(tpp, opp, ovlpp, bpp, filename='{}/fig8c_pixelpercentage.pdf'.format(configuration_dict['visualization_dir']))
 
 	pass
 
