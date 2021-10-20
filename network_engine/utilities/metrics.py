@@ -78,7 +78,7 @@ def gini(array):
 
 # calculate the gini coefficient from a torch array
 def gini_torch(array):
-    """Calculate the Gini coefficient of a numpy array."""
+    """Calculate the Gini coefficient of a torch array."""
     # based on bottom eq:
     # http://www.statsdirect.com/help/generatedimages/equations/equation154.svg
     # from:
