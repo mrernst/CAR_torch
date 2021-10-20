@@ -4,7 +4,7 @@
 <p align="center">
   <img src="https://github.com/mrernst/CAR_torch/blob/master/img/OSCAR_fmnist.png" width="375">
 
-CAR_torch stands for Convolutional Architectures with Recurrence, pytorch implementation. It is the codebase used for the journal publications "Recurrent Processing Improves Occluded Object Recognition and Gives Rise to Perceptual Hysteresis" [1]. 
+CAR_torch stands for Convolutional Architectures with Recurrence, pytorch implementation. It is the codebase used for the journal publication "Recurrent Processing Improves Occluded Object Recognition and Gives Rise to Perceptual Hysteresis" [1]. 
 If you make use of this code please cite as follows:
  
 
