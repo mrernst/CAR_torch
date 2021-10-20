@@ -15,7 +15,7 @@ If you make use of this code please cite as follows:
 
 * Download the OSCAR version 2 datasets from Zenodo and put the in their respective folders in /datasets [![DOI](https://zenodo.org/badge/DOI/10.5281/zenodo.3540900.svg)](https://doi.org/10.5281/zenodo.3540900)
 * Configure the config.py file
-* Start an experiment on a slurm cluster using run_engine.py 
+* Start an experiment on a slurm cluster using run_engine.py or on your local machine with engine.py
 
 ### Prerequisites
 
